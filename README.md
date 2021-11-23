@@ -1,4 +1,24 @@
-# starting kit for the IMaging-PsychiAtry Challenge: predicting autism
+# Information and code for the IMaging-PsychiAtry Challenge setup and analyses
+
+### Accompanying repo for our paper _Insights from an autism imaging biomarker challenge: promises and threats to biomarker discovery_
+available on medRxiv.
+
+Nicolas Traut, Katja Heuer, Guillaume Lemaître, Anita Beggiato, David Germanaud, Monique Elmaleh, Alban Bethegnies, Laurent Bonnasse-Gahot, Weidong Cai, Stanislas Chambon, Freddy Cliquet, Ayoub Ghriss, Nicolas Guigui, Amicie de Pierrefeu, Meng Wang, Valentina Zantedeschi, Alexandre Boucaud, Joris van den Bossche, Balázs Kegl, Richard Delorme, Thomas Bourgeron, Roberto Toro, & Gaël Varoquaux.
+<br />
+<br />
+<br />
+![](https://drive.google.com/uc?id=15UgK8NMCX2ZmLH-hYE4XrCk5J7NpP2Ry)
+<br />
+<br />
+
+# Website describing the vision of the challenge to potential participants
+
+All necessary information about the data, the scientific implications and participation to the challenge have been provided on [the IMPAC challenge website](https://paris-saclay-cds.github.io/autism_challenge).
+
+
+# Preparation of the challenge
+
+## Starting kit for the IMaging-PsychiAtry Challenge: predicting autism
 
 [![Build Status](https://travis-ci.org/ramp-kits/autism.svg?branch=master)](https://travis-ci.org/ramp-kits/autism)
 
@@ -50,4 +70,14 @@ for Linux and MacOS. In Windows, use the following command instead:
 ```
 activate autism
 ```
+
+# The 10 best submissions
+
+Code for the 10 best submissions is available in this repo in the branch `best_submissions`. It holds the feature extractor and classifier scripts from the final submissions that scored best.
+
+
+# Post-hoc analyses
+
+All scripts used for the data analyses and figures presented in our paper can be found in the [autism-challenge-analyses repo](https://github.com/neuroanatomy/autism-challenge-analyses).
+
 
