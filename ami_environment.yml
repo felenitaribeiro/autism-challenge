@@ -4,13 +4,13 @@ channels:
   - conda-forge
 dependencies:
   - scipy
-  - numpy
+  - numpy<1.20
   - pandas>=0.21
   - jupyter
   - matplotlib
-  - scikit-learn>=0.19,<=0.21
+  - scikit-learn>=0.19,<0.22
   - seaborn
-  - nilearn
+  - nilearn<0.8
   - keras
   - tensorflow
   - pytorch-cpu
