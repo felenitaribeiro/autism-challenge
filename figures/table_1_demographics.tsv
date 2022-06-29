@@ -1,0 +1,10 @@
+dataset	variable	controls	ASD
+public set	Sex	449 M, 152 F	471 M, 78 F
+public set	Age (years)	16.89 ± 9.46 (5.89 - 56.2)	17.17 ± 10.5 (5.13 - 64.0)
+public set	Full scale IQ	112.92 ± 13.06 (71.0 - 149.0)	105.85 ± 16.66 (61.0 - 149.0)
+private set	Sex	387 M, 182 F	351 M, 47 F
+private set	Age (years)	20.61 ± 13.45 (4.0 - 70.8)	14.56 ± 6.62 (4.7 - 45.0)
+private set	Full scale IQ	112.39 ± 12.45 (40.0 - 142.0)	104.62 ± 18.22 (41.0 - 149.0)
+replication set	Sex	174 M, 94 F	263 M, 97 F
+replication set	Age (years)	16.95 ± 5.7 (6.89 - 30.98)	16.63 ± 5.48 (7.08 - 30.33)
+replication set	Full scale IQ	103.55 ± 19.28 (50.0 - 142.0)	98.64 ± 19.4 (54.97 - 148.0)
