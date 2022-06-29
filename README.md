@@ -1,7 +1,7 @@
 # Information and code for the IMaging-PsychiAtry Challenge setup and analyses
 
 ### Accompanying repo for our paper _Insights from an autism imaging biomarker challenge: promises and threats to biomarker discovery_
-available on medRxiv.
+available on [medRxiv](https://www.medrxiv.org/content/10.1101/2021.11.24.21266768v3).
 
 Nicolas Traut, Katja Heuer, Guillaume Lemaître, Anita Beggiato, David Germanaud, Monique Elmaleh, Alban Bethegnies, Laurent Bonnasse-Gahot, Weidong Cai, Stanislas Chambon, Freddy Cliquet, Ayoub Ghriss, Nicolas Guigui, Amicie de Pierrefeu, Meng Wang, Valentina Zantedeschi, Alexandre Boucaud, Joris van den Bossche, Balázs Kegl, Richard Delorme, Thomas Bourgeron, Roberto Toro, & Gaël Varoquaux.
 <br />
