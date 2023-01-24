@@ -17,12 +17,13 @@ except ImportError:
 import numpy as np
 import pandas as pd
 # import joblib from scikit-learn to avoid an extra dependency
-from sklearn.externals import joblib
+import joblib
+# from sklearn.externals import joblib
 
 ATLAS = ('basc064', 'basc122', 'basc197', 'craddock_scorr_mean',
          'harvard_oxford_cort_prob_2mm', 'msdl', 'power_2011')
 
-ARCHIVE = {atlas: 'https://storage.ramp.studio/autism/{}.zip'.format(atlas)
+ARCHIVE = {atlas: 'https://zenodo.org/record/3625740/files/{}.zip'.format(atlas)
            for atlas in ATLAS}
 
 CHECKSUM = {
