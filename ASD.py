@@ -10,7 +10,7 @@ from problem import get_cv
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import cross_validate
 from sklearn.model_selection import cross_val_predict
-from problem import get_cv
+from sklearn. metrics import roc_auc_score
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.model_selection import StratifiedKFold
 
@@ -41,16 +41,19 @@ def evaluation(X, y, Classifier, FeatureExtractor):
                             verbose=1, return_train_score=True,
                             n_jobs=2)
   
+
   return results
 
 def evaluation_predict(X,y, Classifier, FeatureExtractor):
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   # Note: in the cross_validate function, they use StratifiedShuffleSplit which allows for resampling
   pipe = make_pipeline(FeatureExtractor(), Classifier())
-  cv = StratifiedKFold(n_splits=5, shuffle = True, random_state=42) 
+  cv_custom = StratifiedKFold(n_splits=5, shuffle = True, random_state=42) 
   
-  results = cross_val_predict(pipe, X, y, cv=cv,
+  results = cross_val_predict(pipe, X, y, cv=cv_custom,
                             verbose=1, n_jobs=2, method='predict')
+  auc_roc_score = roc_auc_score(y, results)
+  print("AUC-ROC Score:", auc_roc_score)
   return results
 
 def gender_ratio_per_fold():
@@ -214,7 +217,7 @@ def general_evaluation(data_train, labels_train, Classifier, FeatureExtractor):
   print("Validation score accuracy: {:.3f} +- {:.3f}".format(
     np.mean(results['test_accuracy']), np.std(results['test_accuracy'])))
 
-def run_pearrr_original(data_train, labels_train):
+def run_pearrr_original(data_train, labels_train, data_test, labels_test):
   print("pearrr_original")
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.pearrr_original.classifier import Classifier
@@ -228,11 +231,11 @@ def run_pearrr_original(data_train, labels_train):
   save_predictions(predictions, data_train, labels_train, "pearrr_original")
   # predictions = load_predictions("mk_original")
 
-  general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
-  general_accuracy(predictions, data_train, labels_train)
-  equal_opportunity(predictions, data_train, labels_train)
+  # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  general_accuracy(predictions, data_test, labels_test)
+  equal_opportunity(predictions, data_test, labels_test)
 
-def run_abethe_original(data_train, labels_train):
+def run_abethe_original(data_train, labels_train, data_test, labels_test):
   print("abethe_original")
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.abethe_original.classifier import Classifier
@@ -246,9 +249,9 @@ def run_abethe_original(data_train, labels_train):
   save_predictions(predictions, data_train, labels_train, "abethe_original")
   # predictions = load_predictions("mk_original")
 
-  general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
-  general_accuracy(predictions, data_train, labels_train)
-  equal_opportunity(predictions, data_train, labels_train)
+  # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  general_accuracy(predictions, data_test, labels_test)
+  equal_opportunity(predictions, data_test, labels_test)
 
 def run_amicie_original(data_train, labels_train, data_test, labels_test):
   print("amicie_original")
@@ -264,11 +267,11 @@ def run_amicie_original(data_train, labels_train, data_test, labels_test):
   save_predictions(predictions, data_train, labels_train, "amicie_original")
   # predictions = load_predictions("mk_original")
 
-  general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
   general_accuracy(predictions, data_test, labels_test)
   equal_opportunity(predictions, data_test, labels_test)
 
-def run_ayoub_ghriss_original(data_train, labels_train):
+def run_ayoub_ghriss_original(data_train, labels_train, data_test, labels_test):
   print("ayoub_ghriss_original")
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.ayoub_ghriss_original.classifier import Classifier
@@ -282,11 +285,11 @@ def run_ayoub_ghriss_original(data_train, labels_train):
   save_predictions(predictions, data_train, labels_train, "ayoub_ghriss_original")
   # predictions = load_predictions("mk_original")
 
-  general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
-  general_accuracy(predictions, data_train, labels_train)
-  equal_opportunity(predictions, data_train, labels_train)
+  # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  general_accuracy(predictions, data_test, labels_test)
+  equal_opportunity(predictions, data_test, labels_test)
 
-def run_lbg_original(data_train, labels_train):
+def run_lbg_original(data_train, labels_train, data_test, labels_test):
   print("lbg_original")
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.lbg_original.classifier import Classifier
@@ -300,11 +303,11 @@ def run_lbg_original(data_train, labels_train):
   save_predictions(predictions, data_train, labels_train, "lbg_original")
   # predictions = load_predictions("mk_original")
 
-  general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
-  general_accuracy(predictions, data_train, labels_train)
-  equal_opportunity(predictions, data_train, labels_train)
+  # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  general_accuracy(predictions, data_test, labels_test)
+  equal_opportunity(predictions, data_test, labels_test)
 
-def run_mk_original(data_train, labels_train):
+def run_mk_original(data_train, labels_train, data_test, labels_test):
   print("mk_original")
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.mk_original.classifier import Classifier
@@ -318,11 +321,11 @@ def run_mk_original(data_train, labels_train):
   save_predictions(predictions, data_train, labels_train, "mk_original")
   # predictions = load_predictions("mk_original")
 
-  general_evaluation(data_train, labels_train,  Classifier, FeatureExtractor)
-  general_accuracy(predictions, data_train, labels_train)
-  equal_opportunity(predictions, data_train, labels_train)
+  # general_evaluation(data_train, labels_train,  Classifier, FeatureExtractor)
+  general_accuracy(predictions, data_test, labels_test)
+  equal_opportunity(predictions, data_test, labels_test)
 
-def run_nguigui_original(data_train, labels_train):
+def run_nguigui_original(data_train, labels_train, data_test, labels_test):
   print("nguigui_original")
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.nguigui_original.classifier import Classifier
@@ -336,11 +339,11 @@ def run_nguigui_original(data_train, labels_train):
   save_predictions(predictions, data_train, labels_train, "nguigui_original")
   # predictions = load_predictions("mk_original")
 
-  general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
-  general_accuracy(predictions, data_train, labels_train)
-  equal_opportunity(predictions, data_train, labels_train)
+  # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  general_accuracy(predictions, data_test, labels_test)
+  equal_opportunity(predictions, data_test, labels_test)
 
-def run_Slasnista_original(data_train, labels_train):
+def run_Slasnista_original(data_train, labels_train, data_test, labels_test):
   print("Slasnista_original")
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.Slasnista_original.classifier import Classifier
@@ -355,10 +358,10 @@ def run_Slasnista_original(data_train, labels_train):
   # predictions = load_predictions("mk_original")
 
   # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
-  general_accuracy(predictions, data_train, labels_train)
-  equal_opportunity(predictions, data_train, labels_train)
+  general_accuracy(predictions, data_test, labels_test)
+  equal_opportunity(predictions, data_test, labels_test)
 
-def run_vzantedeschi_original(data_train, labels_train):
+def run_vzantedeschi_original(data_train, labels_train, data_test, labels_test):
   print("vzantedeschi_original")
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.vzantedeschi_original.classifier import Classifier
@@ -372,11 +375,11 @@ def run_vzantedeschi_original(data_train, labels_train):
   save_predictions(predictions, data_train, labels_train, "vzantedeschi_original")
   # predictions = load_predictions("mk_original")
 
-  general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
-  general_accuracy(predictions, data_train, labels_train)
-  equal_opportunity(predictions, data_train, labels_train)
+  # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  general_accuracy(predictions, data_test, labels_test)
+  equal_opportunity(predictions, data_test, labels_test)
 
-def run_wwwwmmmm_original(data_train, labels_train):
+def run_wwwwmmmm_original(data_train, labels_train, data_test, labels_test):
   print("wwwwmmmm_original")
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.wwwwmmmm_original.classifier import Classifier
@@ -390,9 +393,9 @@ def run_wwwwmmmm_original(data_train, labels_train):
   save_predictions(predictions, data_train, labels_train, "wwwwmmmm_original")
   # predictions = load_predictions("mk_original")
 
-  general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
-  general_accuracy(predictions, data_train, labels_train)
-  equal_opportunity(predictions, data_train, labels_train)
+  # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  general_accuracy(predictions, data_test, labels_test)
+  equal_opportunity(predictions, data_test, labels_test)
 
 def separate_test_suite(overall_set, overall_labels):
   # print(overall_labels.size)
@@ -408,11 +411,11 @@ def separate_test_suite(overall_set, overall_labels):
   test_dataset.loc[:, overall_set.columns] = overall_set.loc[subject_id_test[test_indices]] #Copy all dataframe information w.r.t key values
   
   #New Dataframe Transfer of training data
-  train_dataset = pd.DataFrame(index = subject_id_test[train_indices]) #initialise dataframe with key values with unique acquisition
-  train_dataset.loc[:, overall_set.columns] = overall_set.loc[subject_id_test[train_indices]] #Copy all dataframe information w.r.t key values
+  train_dataset = pd.DataFrame(index = subject_id_train[train_indices]) #initialise dataframe with key values with unique acquisition
+  train_dataset.loc[:, overall_set.columns] = overall_set.loc[subject_id_train[train_indices]] #Copy all dataframe information w.r.t key values
   
   #Discern validity of sample. (Acquisition site has neurodiverse/neurotypical Male/Female)
-  print(test_dataset.loc[:,["participants_site", "participants_sex"]].value_counts())
+  # print(test_dataset.loc[:,["participants_site", "participants_sex"]].value_counts())
   # print(train_dataset.info())
   # print(test_dataset.info())
   return train_dataset, overall_labels[train_indices], test_dataset, overall_labels[test_indices]
@@ -458,15 +461,27 @@ def join_original_datasets(data_train, labels_train, data_test, labels_test):
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 data_train, labels_train, data_test, labels_test = load_data()
+# print(data_train.info())
+# print(labels_train.size)
+# print(data_test.info())
+# print(labels_test.size)
+
+# print(data_train["participants_site"].value_counts().sort_index())
+# print(data_test["participants_site"].value_counts().sort_index())
+
 
 merged_dataset, merged_labels = join_original_datasets(data_train, labels_train, data_test, labels_test)
+# print(merged_dataset.info())
+# print(merged_labels.size)
+# merged_dataset["participants_site"].value_counts().sort_index() #34
+
 
 new_train_dataset, new_train_labels, new_test_dataset, new_test_labels = separate_test_suite(merged_dataset, merged_labels)
 
-print(new_train_dataset.info())
-print(new_train_labels.size)
-print(new_test_dataset.info())
-print(new_test_labels.size)
+# print(new_train_dataset.info())
+# print(new_train_labels.size)
+# print(new_test_dataset.info())
+# print(new_test_labels.size)
 
 
 # print(labels_train)
@@ -482,13 +497,13 @@ print(new_test_labels.size)
 # print_gender_info()
 # gender_ratio_per_fold()
 
-# run_pearrr_original(data_train, labels_train)
-# run_abethe_original(data_train, labels_train)
+run_pearrr_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
+run_abethe_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
 run_amicie_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
-# run_ayoub_ghriss_original(data_train, labels_train)
-# run_lbg_original(data_train, labels_train)
-# run_mk_original(data_train, labels_train)
-# run_nguigui_original(data_train, labels_train)
-# run_Slasnista_original(data_train, labels_train)
-# run_vzantedeschi_original(data_train, labels_train)
-# run_wwwwmmmm_original(data_train, labels_train)
+run_ayoub_ghriss_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
+run_lbg_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
+run_mk_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
+run_nguigui_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
+run_Slasnista_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
+run_vzantedeschi_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
+run_wwwwmmmm_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)

@@ -12,7 +12,7 @@ class Classifier(BaseEstimator):
         self.clf.fit(X, y)
         return self
 
-    def predict(self, X, y):
+    def predict(self, X): #removed y input variable as it is unused and trivial to change this function rather than regeneralise a function to utilise this prediction method.
         return self.clf.predict(X)
 
     def predict_proba(self, X):
