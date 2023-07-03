@@ -50,8 +50,7 @@ def evaluation_predict(X,y, Classifier, FeatureExtractor):
   pipe = make_pipeline(FeatureExtractor(), Classifier())
   cv_custom = StratifiedKFold(n_splits=5, shuffle = True, random_state=42) 
   
-  results = cross_val_predict(pipe, X, y, cv=cv_custom,
-                            verbose=1, n_jobs=2, method='predict')
+  results = cross_val_predict(pipe, X, y, cv=cv_custom, verbose=1, n_jobs=2, method='predict')
   auc_roc_score = roc_auc_score(y, results)
   print("AUC-ROC Score:", auc_roc_score)
   return results
@@ -409,11 +408,12 @@ def separate_test_suite(overall_set, overall_labels):
   #New Dataframe Transfer of testing data
   test_dataset = pd.DataFrame(index = subject_id_test[test_indices]) #initialise dataframe with key values with unique acquisition
   test_dataset.loc[:, overall_set.columns] = overall_set.loc[subject_id_test[test_indices]] #Copy all dataframe information w.r.t key values
-  
+  test_dataset.index.name = "subject_id"
+
   #New Dataframe Transfer of training data
   train_dataset = pd.DataFrame(index = subject_id_train[train_indices]) #initialise dataframe with key values with unique acquisition
   train_dataset.loc[:, overall_set.columns] = overall_set.loc[subject_id_train[train_indices]] #Copy all dataframe information w.r.t key values
-  
+  train_dataset.index.name = "subject_id"
   #Discern validity of sample. (Acquisition site has neurodiverse/neurotypical Male/Female)
   # print(test_dataset.loc[:,["participants_site", "participants_sex"]].value_counts())
   # print(train_dataset.info())
@@ -458,52 +458,75 @@ def determine_test_sample_indicies(overall_set, overall_labels):
 def join_original_datasets(data_train, labels_train, data_test, labels_test):
   return pd.concat([data_train, data_test], ignore_index=False), np.concatenate((labels_train, labels_test))
 
+#Function checks each index of 'dataset_one' and checks if it is 'in' 'dataset_two'.
+#If there are no instances where this occurs, the function will return true (therefore having unique indices)
+#If there are instances of two datasets with duplicate indices, the function will return false at the first instance.
+def determine_unique_dataframe(dataset_one, dataset_two):
+  dataset_one_indices = dataset_one.index.values.copy()
+  dataset_two_indices = dataset_two.index.values.copy()
+  for index in dataset_one_indices:
+    if index in dataset_two_indices:
+      return False
+  return True
 
+#Load data
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 data_train, labels_train, data_test, labels_test = load_data()
+
+#Display initial dataset information
 # print(data_train.info())
 # print(labels_train.size)
 # print(data_test.info())
 # print(labels_test.size)
 
+#Display information of initial datasets with respect to acquisition sites.
 # print(data_train["participants_site"].value_counts().sort_index())
 # print(data_test["participants_site"].value_counts().sort_index())
 
-
+#Merge both intial datasets to preserve all datasets
 merged_dataset, merged_labels = join_original_datasets(data_train, labels_train, data_test, labels_test)
+
+#Display information regarding merged dataset
 # print(merged_dataset.info())
 # print(merged_labels.size)
-# merged_dataset["participants_site"].value_counts().sort_index() #34
+# print(merged_dataset["participants_site"].value_counts().sort_index()) #34
+# print(merged_dataset.index)
 
-
+#Generate randomised test dataset and remove from training dataset.
 new_train_dataset, new_train_labels, new_test_dataset, new_test_labels = separate_test_suite(merged_dataset, merged_labels)
 
+#Check uniqueness of training and test datasets
+print(determine_unique_dataframe(new_train_dataset, new_test_dataset))
+print(determine_unique_dataframe(new_train_dataset, new_train_dataset))
+
+#Display information of training/testing datasets and their results.
+# print(data_train.index)
+# print(new_train_dataset.index)
 # print(new_train_dataset.info())
 # print(new_train_labels.size)
 # print(new_test_dataset.info())
 # print(new_test_labels.size)
 
-
+#Display training/testing results
 # print(labels_train)
 # print(labels_test)
 # print(merged_labels)
 
-
+#Indexing a dataframe
 # print(merged_dataset.loc[10631804530197433027])
 
-
-
-
+#Display gender ratio information
 # print_gender_info()
 # gender_ratio_per_fold()
 
-run_pearrr_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
-run_abethe_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
-run_amicie_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
-run_ayoub_ghriss_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
-run_lbg_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
-run_mk_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
-run_nguigui_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
-run_Slasnista_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
-run_vzantedeschi_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
-run_wwwwmmmm_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
+#Train and test submissions
+# run_pearrr_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
+# run_abethe_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
+# run_amicie_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
+# run_ayoub_ghriss_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
+# run_lbg_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
+# run_mk_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
+# run_nguigui_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels) ##troubleshoot
+# run_Slasnista_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
+# run_vzantedeschi_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
+# run_wwwwmmmm_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
