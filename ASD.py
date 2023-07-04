@@ -11,8 +11,11 @@ from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import cross_validate
 from sklearn.model_selection import cross_val_predict
 from sklearn. metrics import roc_auc_score
+from sklearn. metrics import roc_curve
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.model_selection import StratifiedKFold
+
+import matplotlib.pyplot as plt
 
 def load_data():
   #Load the data
@@ -32,28 +35,25 @@ def print_gender_info(data_train, data_test):
   print(data_test["participants_sex"].value_counts())
 
 
-def evaluation(X, y, Classifier, FeatureExtractor):
-  warnings.filterwarnings("ignore", category=DeprecationWarning)
-  pipe = make_pipeline(FeatureExtractor(), Classifier())
-  cv = get_cv(X, y)
-  # cv = StratifiedKFold(n_splits=5, random_state=42)
-  results = cross_validate(pipe, X, y, scoring=['roc_auc', 'accuracy'], cv=cv,
-                            verbose=1, return_train_score=True,
-                            n_jobs=2)
+# def evaluation(X, y, Classifier, FeatureExtractor):
+#   warnings.filterwarnings("ignore", category=DeprecationWarning)
+#   pipe = make_pipeline(FeatureExtractor(), Classifier())
+#   cv = get_cv(X, y)
+#   # cv = StratifiedKFold(n_splits=5, random_state=42)
+#   results = cross_validate(pipe, X, y, scoring=['roc_auc', 'accuracy'], cv=cv,
+#                             verbose=1, return_train_score=True,
+#                             n_jobs=2)
   
 
-  return results
+#   return results
 
 def evaluation_predict(X,y, Classifier, FeatureExtractor):
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   # Note: in the cross_validate function, they use StratifiedShuffleSplit which allows for resampling
   pipe = make_pipeline(FeatureExtractor(), Classifier())
   cv_custom = StratifiedKFold(n_splits=5, shuffle = True, random_state=42) 
-  
-  results = cross_val_predict(pipe, X, y, cv=cv_custom, verbose=1, n_jobs=2, method='predict')
-  auc_roc_score = roc_auc_score(y, results)
-  print("AUC-ROC Score:", auc_roc_score)
-  return results
+
+  return cross_val_predict(pipe, X, y, cv=cv_custom, verbose=1, n_jobs=2, method='predict')
 
 def gender_ratio_per_fold():
   #gender ratio per cross-validation fold
@@ -123,23 +123,43 @@ def load_predictions(file_name):
 
   return predictions
 
+def plot_auc(labels_train, predictions, name):
+  #define auc-roc score
+  auc_roc_score = roc_auc_score(labels_train, predictions)
 
-def general_accuracy(predictions, data_train, labels_train):
+  #print decimal value
+  print("AUC-ROC Score:", auc_roc_score)
+
+  #determine false positive rate and true positive rate
+  fpr, tpr, thresholds = roc_curve(labels_train, predictions)
+
+  # Plotting the AUC-ROC curve
+  plt.plot(fpr, tpr, label='AUC = %0.3f' % auc_roc_score)
+  plt.plot([0, 1], [0, 1], 'k--')  # Diagonal line representing random guessing
+  plt.xlabel('False Positive Rate')
+  plt.ylabel('True Positive Rate')
+  plt.title('AUC-ROC Curve for ' + name)
+  plt.legend(loc='lower right')
+  plt.show()
+  return auc_roc_score
+
+def general_accuracy(predictions, data_test, labels_test):
   
-  print("General Accurracy: True Positive and True Negative Instances")
+  print("General Accurracy: True Positive and True Negative Accuracy")
   # print(predictions)
   # print(cv_split)
-  # print(data_train)
-  # print(labels_train)
+  # print(data_test)
+  # print(labels_test)
 
   warnings.filterwarnings("ignore", message=".*`np.*` is a deprecated alias.*")
   cv_ga = StratifiedKFold(n_splits=5, shuffle = True, random_state=42) 
-  cv_ga_split = cv_ga.split(data_train, labels_train)
+  cv_ga_split = cv_ga.split(data_test, labels_test)
 
-  fold_pred = [predictions[test] for train, test in cv_ga.split(data_train,labels_train)]
-  fold_labels = [np.array(labels_train)[test] for train, test in cv_ga.split(data_train,labels_train)]
-  data_train_sex = np.array(data_train['participants_sex'])
+  fold_pred = [predictions[test] for train, test in cv_ga.split(data_test,labels_test)]
+  fold_labels = [np.array(labels_test)[test] for train, test in cv_ga.split(data_test,labels_test)]
+  data_test_sex = np.array(data_test['participants_sex'])
   i = 0
+  fold_results = []
   for train_index, test_index in cv_ga_split:
 
     male_accuracy = 0
@@ -147,8 +167,8 @@ def general_accuracy(predictions, data_train, labels_train):
     female_accuracy = 0
     female_total = 0
 
-    train = data_train_sex[train_index]
-    test = data_train_sex[test_index]
+    train = data_test_sex[train_index]
+    test = data_test_sex[test_index]
 
     for index in range(len(fold_pred[i])): 
       if test[index] == 'M':
@@ -160,25 +180,30 @@ def general_accuracy(predictions, data_train, labels_train):
         if round(fold_pred[i][index]) == fold_labels[i][index]:
           female_accuracy += 1
     i += 1
-    
-    print("Male: ", male_accuracy, " out of ", male_total,", ", round(male_accuracy/male_total*100, 2), "%. Female: ", female_accuracy, " out of ", female_total, ", ", round(female_accuracy/female_total*100, 2), "%. Total participants: ", female_total + male_total, sep="")
+    male_ga = round(male_accuracy/male_total*100, 2)
+    female_ga = round(female_accuracy/female_total*100, 2)
+    ga_score = male_ga-female_ga
+    print("Male: ", male_accuracy, " out of ", male_total,", ", male_ga, "%. Female: ", female_accuracy, " out of ", female_total, ", ", female_ga, "%. Total participants: ", female_total + male_total, sep="")
+    fold_results.append((np.abs(round(ga_score, 2)), round(abs(ga_score)/-ga_score))) #1 = F, -1 = M
+  print("Fold Results: ", fold_results)
+  return fold_results
 
-
-def equal_opportunity(predictions, data_train, labels_train):
+def equal_opportunity(predictions, data_test, labels_test):
   cv_eo = StratifiedKFold(n_splits=5, shuffle = True, random_state=42) 
-  cv_eo_split = cv_eo.split(data_train, labels_train)
-  print("Equal Opportunity: True Positive Instances")
+  cv_eo_split = cv_eo.split(data_test, labels_test)
+  print("Equal Opportunity: Equal True Positive Rate")
   # print(predictions)
   # print(cv_split)
-  # print(data_train)
-  # print(labels_train)
+  # print(data_test)
+  # print(labels_test)
   
   warnings.filterwarnings("ignore", message=".*`np.*` is a deprecated alias.*")
 
-  fold_pred = [predictions[test] for train, test in cv_eo.split(data_train,labels_train)]
-  fold_labels = [np.array(labels_train)[test] for train, test in cv_eo.split(data_train,labels_train)]
-  data_train_sex = np.array(data_train['participants_sex'])
+  fold_pred = [predictions[test] for train, test in cv_eo.split(data_test, labels_test)]  #predicted labels
+  fold_labels = [np.array(labels_test)[test] for train, test in cv_eo.split(data_test, labels_test)]  #true labels
+  data_test_sex = np.array(data_test['participants_sex'])
   i = 0
+  fold_results = []
   for train_index, test_index in cv_eo_split:
 
     male_accuracy = 0
@@ -186,38 +211,50 @@ def equal_opportunity(predictions, data_train, labels_train):
     female_accuracy = 0
     female_total = 0
 
-    train = data_train_sex[train_index]
-    test = data_train_sex[test_index]
+    train_sex = data_test_sex[train_index]
+    test_sex = data_test_sex[test_index]
 
     for index in range(len(fold_pred[i])): 
 
-      if test[index] == 'M' and fold_labels[i][index] == 1:
+      if test_sex[index] == 'M' and round(fold_pred[i][index]) == 1:
         male_total += 1
         if round(fold_pred[i][index]) == fold_labels[i][index]:
           male_accuracy += 1
-      elif test[index] == 'F' and fold_labels[i][index] == 1:
+      elif test_sex[index] == 'F' and round(fold_pred[i][index]) == 1:
         female_total += 1
         if round(fold_pred[i][index]) == fold_labels[i][index]:
           female_accuracy += 1
     i += 1
-    
-    print("Male: ", male_accuracy, " out of ", male_total,", ", round(male_accuracy/male_total*100, 2), "%. Female: ", female_accuracy, " out of ", female_total, ", ", round(female_accuracy/female_total*100, 2), "%. Total participants: ", female_total + male_total, sep="")
+    male_eo = round(male_accuracy/male_total*100, 2)
+    female_eo = round(female_accuracy/female_total*100, 2)
+    eo_score = male_eo-female_eo
+    print("Male: ", male_accuracy, " out of ", male_total,", ", male_eo, "%. Female: ", female_accuracy, " out of ", female_total, ", ", female_eo, "%. Total (TP + FN) : ", female_total + male_total, sep="")
+    fold_results.append((np.abs(round(eo_score, 2)), round(abs(eo_score)/-eo_score))) #1 = F, -1 = M
+  print("Fold Results: ", fold_results)
+  return fold_results
 
-def general_evaluation(data_train, labels_train, Classifier, FeatureExtractor):
-  results = evaluation(data_train, labels_train, Classifier, FeatureExtractor)
 
-  print("Training score ROC-AUC: {:.3f} +- {:.3f}".format(
-    np.mean(results['train_roc_auc']), np.std(results['train_roc_auc'])))
-  print("Validation score ROC-AUC: {:.3f} +- {:.3f} \n".format(
-    np.mean(results['test_roc_auc']), np.std(results['test_roc_auc'])))
 
-  print("Training score accuracy: {:.3f} +- {:.3f}".format(
-    np.mean(results['train_accuracy']), np.std(results['train_accuracy'])))
-  print("Validation score accuracy: {:.3f} +- {:.3f}".format(
-    np.mean(results['test_accuracy']), np.std(results['test_accuracy'])))
+#Alternate, prior, method to determine aucroc score.
+#No longer used due to keep cross-validation folds consistent.
+# def general_evaluation(data_train, labels_train, Classifier, FeatureExtractor):
+  # results = evaluation(data_train, labels_train, Classifier, FeatureExtractor)
 
+  # print("Training score ROC-AUC: {:.3f} +- {:.3f}".format(
+  #   np.mean(results['train_roc_auc']), np.std(results['train_roc_auc'])))
+  # print("Validation score ROC-AUC: {:.3f} +- {:.3f} \n".format(
+  #   np.mean(results['test_roc_auc']), np.std(results['test_roc_auc'])))
+
+  # print("Training score accuracy: {:.3f} +- {:.3f}".format(
+  #   np.mean(results['train_accuracy']), np.std(results['train_accuracy'])))
+  # print("Validation score accuracy: {:.3f} +- {:.3f}".format(
+  #   np.mean(results['test_accuracy']), np.std(results['test_accuracy'])))
+
+
+#Functions to run each submission
 def run_pearrr_original(data_train, labels_train, data_test, labels_test):
-  print("pearrr_original")
+  name = "pearrr_original"
+  print(name)
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.pearrr_original.classifier import Classifier
   warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -227,15 +264,18 @@ def run_pearrr_original(data_train, labels_train, data_test, labels_test):
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   predictions = initialise_predictions(data_train, labels_train, Classifier, FeatureExtractor)
-  save_predictions(predictions, data_train, labels_train, "pearrr_original")
+  save_predictions(predictions, data_train, labels_train, name)
   # predictions = load_predictions("mk_original")
 
   # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  submission_results = []
+  submission_results.append(plot_auc(labels_train, predictions, name))
   general_accuracy(predictions, data_test, labels_test)
   equal_opportunity(predictions, data_test, labels_test)
 
 def run_abethe_original(data_train, labels_train, data_test, labels_test):
-  print("abethe_original")
+  name = "abethe_original"
+  print(name)
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.abethe_original.classifier import Classifier
   warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -245,15 +285,17 @@ def run_abethe_original(data_train, labels_train, data_test, labels_test):
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   predictions = initialise_predictions(data_train, labels_train, Classifier, FeatureExtractor)
-  save_predictions(predictions, data_train, labels_train, "abethe_original")
+  save_predictions(predictions, data_train, labels_train, name)
   # predictions = load_predictions("mk_original")
 
   # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  plot_auc(labels_train, predictions, name)
   general_accuracy(predictions, data_test, labels_test)
   equal_opportunity(predictions, data_test, labels_test)
 
 def run_amicie_original(data_train, labels_train, data_test, labels_test):
-  print("amicie_original")
+  name = "amicie_original"
+  print(name)
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.amicie_original.classifier import Classifier
   warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -263,15 +305,17 @@ def run_amicie_original(data_train, labels_train, data_test, labels_test):
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   predictions = initialise_predictions(data_train, labels_train, Classifier, FeatureExtractor)
-  save_predictions(predictions, data_train, labels_train, "amicie_original")
+  save_predictions(predictions, data_train, labels_train, name)
   # predictions = load_predictions("mk_original")
 
   # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  plot_auc(labels_train, predictions, name)
   general_accuracy(predictions, data_test, labels_test)
   equal_opportunity(predictions, data_test, labels_test)
 
 def run_ayoub_ghriss_original(data_train, labels_train, data_test, labels_test):
-  print("ayoub_ghriss_original")
+  name = "ayoub_ghriss_original"
+  print(name)
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.ayoub_ghriss_original.classifier import Classifier
   warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -281,15 +325,17 @@ def run_ayoub_ghriss_original(data_train, labels_train, data_test, labels_test):
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   predictions = initialise_predictions(data_train, labels_train, Classifier, FeatureExtractor)
-  save_predictions(predictions, data_train, labels_train, "ayoub_ghriss_original")
+  save_predictions(predictions, data_train, labels_train, name)
   # predictions = load_predictions("mk_original")
 
   # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  plot_auc(labels_train, predictions, name)
   general_accuracy(predictions, data_test, labels_test)
   equal_opportunity(predictions, data_test, labels_test)
 
 def run_lbg_original(data_train, labels_train, data_test, labels_test):
-  print("lbg_original")
+  name = "lbg_original"
+  print(name)
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.lbg_original.classifier import Classifier
   warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -299,15 +345,17 @@ def run_lbg_original(data_train, labels_train, data_test, labels_test):
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   predictions = initialise_predictions(data_train, labels_train, Classifier, FeatureExtractor)
-  save_predictions(predictions, data_train, labels_train, "lbg_original")
+  save_predictions(predictions, data_train, labels_train, name)
   # predictions = load_predictions("mk_original")
 
   # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  plot_auc(labels_train, predictions, name)
   general_accuracy(predictions, data_test, labels_test)
   equal_opportunity(predictions, data_test, labels_test)
 
 def run_mk_original(data_train, labels_train, data_test, labels_test):
-  print("mk_original")
+  name = "mk_original"
+  print(name)
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.mk_original.classifier import Classifier
   warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -317,15 +365,17 @@ def run_mk_original(data_train, labels_train, data_test, labels_test):
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   predictions = initialise_predictions(data_train, labels_train, Classifier, FeatureExtractor)
-  save_predictions(predictions, data_train, labels_train, "mk_original")
+  save_predictions(predictions, data_train, labels_train, name)
   # predictions = load_predictions("mk_original")
 
-  # general_evaluation(data_train, labels_train,  Classifier, FeatureExtractor)
+  # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  plot_auc(labels_train, predictions, name)
   general_accuracy(predictions, data_test, labels_test)
   equal_opportunity(predictions, data_test, labels_test)
 
 def run_nguigui_original(data_train, labels_train, data_test, labels_test):
-  print("nguigui_original")
+  name = "nguigui_original"
+  print(name)
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.nguigui_original.classifier import Classifier
   warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -335,15 +385,17 @@ def run_nguigui_original(data_train, labels_train, data_test, labels_test):
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   predictions = initialise_predictions(data_train, labels_train, Classifier, FeatureExtractor)
-  save_predictions(predictions, data_train, labels_train, "nguigui_original")
+  save_predictions(predictions, data_train, labels_train, name)
   # predictions = load_predictions("mk_original")
 
   # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  plot_auc(labels_train, predictions, name)
   general_accuracy(predictions, data_test, labels_test)
   equal_opportunity(predictions, data_test, labels_test)
 
 def run_Slasnista_original(data_train, labels_train, data_test, labels_test):
-  print("Slasnista_original")
+  name = "Slasnista_original"
+  print(name)
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.Slasnista_original.classifier import Classifier
   warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -353,15 +405,17 @@ def run_Slasnista_original(data_train, labels_train, data_test, labels_test):
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   predictions = initialise_predictions(data_train, labels_train, Classifier, FeatureExtractor)
-  save_predictions(predictions, data_train, labels_train, "Slasnista_original")
+  save_predictions(predictions, data_train, labels_train, name)
   # predictions = load_predictions("mk_original")
 
   # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  plot_auc(labels_train, predictions, name)
   general_accuracy(predictions, data_test, labels_test)
   equal_opportunity(predictions, data_test, labels_test)
 
 def run_vzantedeschi_original(data_train, labels_train, data_test, labels_test):
-  print("vzantedeschi_original")
+  name = "vzantedeschi_original"
+  print(name)
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.vzantedeschi_original.classifier import Classifier
   warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -371,15 +425,17 @@ def run_vzantedeschi_original(data_train, labels_train, data_test, labels_test):
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   predictions = initialise_predictions(data_train, labels_train, Classifier, FeatureExtractor)
-  save_predictions(predictions, data_train, labels_train, "vzantedeschi_original")
+  save_predictions(predictions, data_train, labels_train, name)
   # predictions = load_predictions("mk_original")
 
   # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  plot_auc(labels_train, predictions, name)
   general_accuracy(predictions, data_test, labels_test)
   equal_opportunity(predictions, data_test, labels_test)
 
 def run_wwwwmmmm_original(data_train, labels_train, data_test, labels_test):
-  print("wwwwmmmm_original")
+  name = "wwwwmmmm_original"
+  print(name)
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   from submissions.wwwwmmmm_original.classifier import Classifier
   warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -389,10 +445,11 @@ def run_wwwwmmmm_original(data_train, labels_train, data_test, labels_test):
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   predictions = initialise_predictions(data_train, labels_train, Classifier, FeatureExtractor)
-  save_predictions(predictions, data_train, labels_train, "wwwwmmmm_original")
+  save_predictions(predictions, data_train, labels_train, name)
   # predictions = load_predictions("mk_original")
 
   # general_evaluation(data_train, labels_train, Classifier, FeatureExtractor)
+  plot_auc(labels_train, predictions, name)
   general_accuracy(predictions, data_test, labels_test)
   equal_opportunity(predictions, data_test, labels_test)
 
@@ -496,8 +553,8 @@ merged_dataset, merged_labels = join_original_datasets(data_train, labels_train,
 new_train_dataset, new_train_labels, new_test_dataset, new_test_labels = separate_test_suite(merged_dataset, merged_labels)
 
 #Check uniqueness of training and test datasets
-print(determine_unique_dataframe(new_train_dataset, new_test_dataset))
-print(determine_unique_dataframe(new_train_dataset, new_train_dataset))
+# print(determine_unique_dataframe(new_train_dataset, new_test_dataset))
+# print(determine_unique_dataframe(new_train_dataset, new_train_dataset))
 
 #Display information of training/testing datasets and their results.
 # print(data_train.index)
@@ -526,7 +583,7 @@ print(determine_unique_dataframe(new_train_dataset, new_train_dataset))
 # run_ayoub_ghriss_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
 # run_lbg_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
 # run_mk_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
-# run_nguigui_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels) ##troubleshoot
+run_nguigui_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
 # run_Slasnista_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
 # run_vzantedeschi_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
 # run_wwwwmmmm_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels)
