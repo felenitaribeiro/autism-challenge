@@ -23,6 +23,8 @@ import seaborn as sns
 
 import matplotlib.pyplot as plt
 
+from os.path import exists
+
 
 def load_data():
   #Load the data
@@ -82,40 +84,18 @@ def initialise_predictions(data_train, labels_train, Classifier, FeatureExtracto
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   return evaluation_predict(data_train, labels_train, Classifier, FeatureExtractor)
 
-def save_predictions(predictions, data_train, labels_train, file_name):
+def check_for_saved_file(seed):
+  return exists("saved_outcomes/"+str(seed)+".txt")
+
+def save_predictions(seed, predictions):
   warnings.filterwarnings("ignore", message=".*`np.*` is a deprecated alias.*")
-  cv_save = StratifiedKFold(n_splits=5, shuffle = True, random_state=42) 
-  cv_save_split = cv_save.split(data_train, labels_train)
 
-  fold_pred = [predictions[test] for train, test in cv_save.split(data_train,labels_train)]
-  fold_labels = [np.array(labels_train)[test] for train, test in cv_save.split(data_train,labels_train)]
-  data_train_sex = np.array(data_train['participants_sex'])
-
-  i = 0
-  f = open("saved_outcomes/"+file_name+".txt", "w")
-  for train_index, test_index in cv_save_split:
-
-    test = data_train_sex[test_index]
-    for index in range(len(fold_pred[i])): 
-      f.write(str(fold_pred[i][index]))
-      f.write(",")
-      f.write(str(fold_labels[i][index]))
-      f.write(",")
-      f.write(test[index])
-      f.write(",")
-      f.write("\n")
-    i += 1
+  f = open("saved_outcomes/"+str(seed)+".txt", "w")
   f.close()
+  predictions.to_csv("saved_outcomes/"+str(seed)+".txt", index = True, index_label = ['submission', 'type', 'category'])
 
-def load_predictions(file_name):
-  prediction_file = open("saved_outcomes/"+file_name+".txt", "r")
-  
-  predictions = []
-
-  for line in prediction_file:
-    predictions.append(line.split(","))
-
-  return predictions
+def load_predictions(seed):
+  return pd.read_csv("saved_outcomes/"+str(seed)+".txt", index_col = ['submission', 'type', 'category'])
 
 def plot_auc(labels_train, predictions, name):
   #define auc-roc score
@@ -137,7 +117,7 @@ def plot_auc(labels_train, predictions, name):
   plt.show()
   return auc_roc_score
 
-def general_accuracy_old(predictions, data_train, labels_train):
+def general_accuracy_old(predictions, data_train, labels_train, seed):
   
   # print("General Accurracy: True Positive and True Negative Accuracy")
   # print(predictions)
@@ -146,7 +126,7 @@ def general_accuracy_old(predictions, data_train, labels_train):
   # print(labels_train)
 
   warnings.filterwarnings("ignore", message=".*`np.*` is a deprecated alias.*")
-  cv_ga = StratifiedKFold(n_splits=5, shuffle = True, random_state=42) 
+  cv_ga = StratifiedKFold(n_splits=5, shuffle = True, random_state = seed) 
   cv_ga_split = cv_ga.split(data_train, labels_train)
 
   fold_pred = [predictions[test] for train, test in cv_ga.split(data_train, labels_train)]
@@ -304,7 +284,7 @@ def separate_test_suite(overall_set, overall_labels):
 
   
 def determine_test_sample_indices(overall_set, overall_labels):
-  np.random.seed(42)
+
   test_data = []
   i = 0
 
@@ -567,7 +547,7 @@ def run_mk_original(data_train, labels_train, data_test, labels_test, sex_test):
 
   return organised_submission_results
 
-def run_nguigui_original(data_train, labels_train, data_test, labels_test, sex_test):
+def run_nguigui_original(data_train, labels_train, data_test, labels_test, sex_test, seed):
   name = "nguigui_original"
   print(name)
   warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -652,81 +632,88 @@ def run_wwwwmmmm_original(data_train, labels_train, data_test, labels_test, sex_
 
   return organised_submission_results
 
-#Load data
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-data_train, labels_train, data_test, labels_test = load_data()
 
-#Display initial dataset information
-# print(data_train.info())
-# print(labels_train.size)
-# print(data_test.info())
-# print(labels_test.size)
+def run_tests(seed):
+  np.random.seed(seed)
+  #Load data
+  warnings.filterwarnings("ignore", category=DeprecationWarning)
+  data_train, labels_train, data_test, labels_test = load_data()
 
-#Display information of initial datasets with respect to acquisition sites.
-# print(data_train["participants_site"].value_counts().sort_index())
-# print(data_test["participants_site"].value_counts().sort_index())
+  #Display initial dataset information
+  # print(data_train.info())
+  # print(labels_train.size)
+  # print(data_test.info())
+  # print(labels_test.size)
 
-#Merge both intial datasets to preserve all datasets
-merged_dataset, merged_labels = join_original_datasets(data_train, labels_train, data_test, labels_test)
+  #Display information of initial datasets with respect to acquisition sites.
+  # print(data_train["participants_site"].value_counts().sort_index())
+  # print(data_test["participants_site"].value_counts().sort_index())
 
-#Display information regarding merged dataset
-# print(merged_dataset.info())
-# print(merged_labels.size)
-# print(merged_dataset["participants_site"].value_counts().sort_index()) #34
-# print(merged_dataset.index)
+  #Merge both intial datasets to preserve all datasets
+  merged_dataset, merged_labels = join_original_datasets(data_train, labels_train, data_test, labels_test)
 
-#Generate randomised test dataset and remove from training dataset.
-new_train_dataset, new_train_labels, new_test_dataset, new_test_labels = separate_test_suite(merged_dataset, merged_labels)
-# print(new_test_dataset.head(5))
+  #Display information regarding merged dataset
+  # print(merged_dataset.info())
+  # print(merged_labels.size)
+  # print(merged_dataset["participants_site"].value_counts().sort_index()) #34
+  # print(merged_dataset.index)
 
-sex_test = sex_index_split(new_test_dataset)
-# print(sex_test)
-#Check uniqueness of training and test datasets
-# print(determine_unique_dataframe(new_train_dataset, new_test_dataset))
-# print(determine_unique_dataframe(new_train_dataset, new_train_dataset))
+  #Generate randomised test dataset and remove from training dataset.
+  new_train_dataset, new_train_labels, new_test_dataset, new_test_labels = separate_test_suite(merged_dataset, merged_labels)
+  # print(new_test_dataset.head(5))
 
-#Display information of training/testing datasets and their results.
-# print(data_train.index)
-# print(new_train_dataset.index)
-# print(new_train_dataset.info())
-# print(new_train_labels.size)
-# print(new_test_dataset.info())
-# print(new_test_labels.size)
+  sex_test = sex_index_split(new_test_dataset)
+  # print(sex_test)
+  #Check uniqueness of training and test datasets
+  # print(determine_unique_dataframe(new_train_dataset, new_test_dataset))
+  # print(determine_unique_dataframe(new_train_dataset, new_train_dataset))
 
-#Display training/testing results
-# print(labels_train)
-# print(labels_test)
-# print(merged_labels)
+  #Display information of training/testing datasets and their results.
+  # print(data_train.index)
+  # print(new_train_dataset.index)
+  # print(new_train_dataset.info())
+  # print(new_train_labels.size)
+  # print(new_test_dataset.info())
+  # print(new_test_labels.size)
 
-#Indexing a dataframe
-# print(merged_dataset.loc[10631804530197433027])
+  #Display training/testing results
+  # print(labels_train)
+  # print(labels_test)
+  # print(merged_labels)
 
-#Display gender ratio information
-# print_gender_info()
-# gender_ratio_per_fold()
+  #Indexing a dataframe
+  # print(merged_dataset.loc[10631804530197433027])
 
-#Train and test submissions
+  #Display gender ratio information
+  # print_gender_info()
+  # gender_ratio_per_fold()
+  
+  if check_for_saved_file(seed) == False:
+    #Train and test submissions
 
-submissions = run_pearrr_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)
-# submissions = pd.concat([submissions, run_abethe_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
-# submissions = pd.concat([submissions, run_amicie_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
-# submissions = pd.concat([submissions, run_ayoub_ghriss_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
-# submissions = pd.concat([submissions, run_lbg_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
-# submissions = pd.concat([submissions, run_mk_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
-# submissions = run_nguigui_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)
-submissions = pd.concat([submissions, run_nguigui_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
-# submissions = pd.concat([submissions, run_Slasnista_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
-# submissions = pd.concat([submissions, run_vzantedeschi_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
-# submissions = pd.concat([submissions, run_wwwwmmmm_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    # submissions = run_pearrr_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)
+    # submissions = pd.concat([submissions, run_abethe_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    # submissions = pd.concat([submissions, run_amicie_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    # submissions = pd.concat([submissions, run_ayoub_ghriss_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    # submissions = pd.concat([submissions, run_lbg_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    # submissions = pd.concat([submissions, run_mk_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    submissions = run_nguigui_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test, seed)
+    # submissions = pd.concat([submissions, run_nguigui_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    # submissions = pd.concat([submissions, run_Slasnista_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    # submissions = pd.concat([submissions, run_vzantedeschi_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    # submissions = pd.concat([submissions, run_wwwwmmmm_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+  else:
+    submissions = load_predictions(seed)
 
-print(submissions)
+  print(submissions)
 
-create_violin_graph(submissions)
-fig= plt.figure(figsize=(90, 10))
-submissions["Average"].plot.bar()
-plt.xticks(rotation = 90)
-plt.legend(loc=(1.04, 0))
-plt.show()
+  create_violin_graph(submissions)
+  fig= plt.figure(figsize=(90, 10))
+  submissions["Average"].plot.bar()
+  plt.xticks(rotation = 90)
+  plt.legend(loc=(1.04, 0))
+  plt.show()
+  save_predictions(seed, submissions)
 
 def test_suite():
   x = np.random.rand()
@@ -815,3 +802,6 @@ def test_suite():
 # plt.xticks(rotation = 90)
 # plt.legend(loc=(1.04, 0))
 # plt.show()
+
+random_seed = 42
+run_tests(random_seed)
