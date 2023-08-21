@@ -25,6 +25,8 @@ import matplotlib.pyplot as plt
 
 from os.path import exists
 
+import csv as cs
+
 
 def load_data():
   #Load the data
@@ -90,12 +92,21 @@ def check_for_saved_file(seed):
 def save_predictions(seed, predictions):
   warnings.filterwarnings("ignore", message=".*`np.*` is a deprecated alias.*")
 
-  f = open("saved_outcomes/"+str(seed)+".txt", "w")
-  f.close()
-  predictions.to_csv("saved_outcomes/"+str(seed)+".txt", index = True, index_label = ['submission', 'type', 'category'])
+  # with open("saved_outcomes/"+str(seed)+".txt", "w", newline = "\n") as f:
+  #   write = cs.writer(f)
+  #   for row in predictions:
+  #     write.writerow(row)
+  # f.close()
+  predictions.to_csv("saved_outcomes/"+str(seed)+".txt", index = True)
 
 def load_predictions(seed):
-  return pd.read_csv("saved_outcomes/"+str(seed)+".txt", index_col = ['submission', 'type', 'category'])
+  # results = []
+  # with open("saved_outcomes/"+str(seed)+".txt", "r", newline = "\n") as f:
+  #   read = cs.reader(f)
+  #   for row in read:
+  #     results.append(row)
+  # return results 
+  return pd.read_csv("saved_outcomes/"+str(seed)+".txt")
 
 def plot_auc(labels_train, predictions, name):
   #define auc-roc score
@@ -167,7 +178,7 @@ def general_accuracy_old(predictions, data_train, labels_train, seed):
 
 def train_folds(data_train, labels_train, data_test, labels_test, Classifier, FeatureExtractor):
   #Create crossvalidation code
-  folds = 1
+  # folds = 1
   fold_results = []
   cv_custom = StratifiedKFold(n_splits=5, shuffle = True, random_state=42) 
 
@@ -195,28 +206,142 @@ def train_folds(data_train, labels_train, data_test, labels_test, Classifier, Fe
     # Evaluate the model's performance on the external dataset
     # accuracy_external = accuracy_score(labels_test, predictions_external)
     # print("External Dataset Accuracy of Fold:", folds, "at", round(accuracy_external*100, 2), "%.")
-    folds += 1
+    # folds += 1
   return fold_results
 
+def create_dataframe(name, fold_stat_results):
 
-def general_accuracy(training_results, labels_test, sex_test):
-  fold_results = {}
-  i = 1
-  for predicted_labels in training_results:
-    ga_results = {}
-    ga_results["overall"] = accuracy_score(labels_test, predicted_labels)
+  dataframe_names = [name + "_overall", name + "_male", name + "_female"]
+  dataframe_contents = {"submission": dataframe_names}
 
-    male_results = predicted_labels[sex_test[0]]
-    ga_results["male"] = accuracy_score(labels_test[sex_test[0]], male_results)
+  fold_number = 1
+  for fold in fold_stat_results:
+    TP = []
+    FP = []
+    FN = []
+    TN = []
+    for results in fold:
+      print("Fold results", results)
+      TP.append(results[0])
+      FP.append(results[1])
+      FN.append(results[2])
+      TN.append(results[3])
+    dataframe_contents["TP"+"_"+str(fold_number)] = TP.copy()
+    dataframe_contents["FP"+"_"+str(fold_number)] = FP.copy()
+    dataframe_contents["FN"+"_"+str(fold_number)] = FN.copy()
+    dataframe_contents["TN"+"_"+str(fold_number)] = TN.copy()
+    fold_number += 1
+  # print(dataframe_contents)
+  dataframed_results = pd.DataFrame(dataframe_contents)
+  dataframed_results.set_index("submission", inplace=True)
+  return dataframed_results
 
-    female_results = predicted_labels[sex_test[1]]
-    ga_results["female"] = accuracy_score(labels_test[sex_test[1]], female_results)
-    
-    fold_results[i] = ga_results.copy()
+def process_results(raw_results, labels, sex):
+  result = []
+  for predicted_results in raw_results:
+    result.append(true_positive(labels, predicted_results, sex))
+  return result
+      
+
+def true_positive(labels, results, sex):     
+  male_results = results[sex[0]]
+  male_labels = labels[sex[0]]
+  female_results = results[sex[1]]
+  female_labels = labels[sex[1]]
+
+
+  overall_true_positive = 0
+  overall_false_positive = 0
+  overall_true_negative = 0
+  overall_false_negative = 0
+
+  male_true_positive = 0
+  male_false_positive = 0
+  male_true_negative = 0
+  male_false_negative = 0
+
+
+  female_true_positive = 0
+  female_false_positive = 0
+  female_true_negative = 0
+  female_false_negative = 0
+
+  i = 0
+  while i < len(labels):
+    if labels[i] == 1 and results[i] == 1:
+      overall_true_positive += 1
+    elif results[i] == 0 and labels[i] == 1:
+      overall_false_negative += 1
+    elif results[i] == 1 and labels[i] == 0:
+      overall_false_positive += 1
+    elif labels[i] == 0 and results[i] == 0:
+      overall_true_negative += 1
+    i += 1
+  i = 0
+  while i < len(male_labels):
+    if male_labels[i] == 1 and male_results[i] == 1:
+      male_true_positive += 1
+    elif male_results[i] == 0 and male_labels[i] == 1:
+      male_false_negative += 1
+    elif male_results[i] == 1 and male_labels[i] == 0:
+      male_false_positive += 1
+    elif male_labels[i] == 0 and male_results[i] == 0:
+      male_true_negative += 1
+    i += 1
+  i = 0
+  while i < len(female_labels):
+    if female_labels[i] == 1 and female_results[i] == 1:
+      female_true_positive += 1
+    elif female_results[i] == 0 and female_labels[i] == 1:
+      female_false_negative += 1
+    elif female_results[i] == 1 and female_labels[i] == 0:
+      female_false_positive += 1
+    elif female_labels[i] == 0 and female_results[i] == 0:
+      female_true_negative += 1
     i += 1
 
+  return [(overall_true_positive, overall_false_positive, overall_false_negative, overall_true_negative), 
+          (male_true_positive, male_false_positive, male_false_negative, male_true_negative), 
+          (female_true_positive, female_false_positive, female_false_negative, female_true_negative)]
 
-  return(fold_results)
+
+
+def general_accuracy(results):
+  i = 1
+  test_names = results.index.values.tolist()
+  headings = results.columns.values.tolist()
+  ga = []
+  names = []
+  while ("TP"+"_"+str(i)) in headings:
+    TP_fold = results["TP"+"_"+str(i)].values.tolist()
+    FP_fold = results["FP"+"_"+str(i)].values.tolist()
+    FN_fold = results["FN"+"_"+str(i)].values.tolist()
+    TN_fold = results["TN"+"_"+str(i)].values.tolist()
+
+    j = 0
+    while j < len(TP_fold):
+      ga.append((TP_fold[j] + TN_fold[j])/(TP_fold[j] + FP_fold[j] + FN_fold[j] + TN_fold[j]))
+      j += 1
+
+    k = 0
+    while k <len(test_names):
+      names.append(test_names[k]+"_"+str(i))
+      k += 1
+    i += 1
+  print(len(names))
+  print(len(ga))
+  fig= plt.figure(figsize=(30, 10))
+  plt.bar(names, ga)
+  plt.title('title name')
+  plt.xlabel('x_axis name')
+  plt.ylabel('y_axis name')
+  plt.xticks(rotation = 90)
+  plt.legend(loc=(1.04, 0))
+  plt.show()
+
+
+
+
 
 def true_positive_rate(labels_test, predicted_labels):
   true_positive = 0
@@ -432,15 +557,11 @@ def run_pearrr_original(data_train, labels_train, data_test, labels_test, sex_te
   download_data()
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
-  raw_submission_results = {}
+
   fold_results = train_folds(data_train, labels_train, data_test, labels_test, Classifier, FeatureExtractor)
-  raw_submission_results["ga"] = general_accuracy(fold_results, labels_test, sex_test)
-  raw_submission_results["eo"] = equal_opportunity(fold_results, labels_test, sex_test)
-  print("Results:", raw_submission_results)
+  fold_stat_results = process_results(fold_results, labels_test, sex_test)
 
-  organised_submission_results = organise_results(name, raw_submission_results)
-
-  return organised_submission_results
+  return create_dataframe(name, fold_stat_results)
 
 def run_abethe_original(data_train, labels_train, data_test, labels_test, sex_test):
   name = "abethe_original"
@@ -453,15 +574,11 @@ def run_abethe_original(data_train, labels_train, data_test, labels_test, sex_te
   download_data()
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
-  raw_submission_results = {}
+
   fold_results = train_folds(data_train, labels_train, data_test, labels_test, Classifier, FeatureExtractor)
-  raw_submission_results["ga"] = general_accuracy(fold_results, labels_test, sex_test)
-  raw_submission_results["eo"] = equal_opportunity(fold_results, labels_test, sex_test)
-  print("Results:", raw_submission_results)
+  fold_stat_results = process_results(fold_results, labels_test, sex_test)
 
-  organised_submission_results = organise_results(name, raw_submission_results)
-
-  return organised_submission_results
+  return create_dataframe(name, fold_stat_results)
 
 def run_amicie_original(data_train, labels_train, data_test, labels_test, sex_test):
   name = "amicie_original"
@@ -474,15 +591,11 @@ def run_amicie_original(data_train, labels_train, data_test, labels_test, sex_te
   download_data()
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
-  raw_submission_results = {}
+
   fold_results = train_folds(data_train, labels_train, data_test, labels_test, Classifier, FeatureExtractor)
-  raw_submission_results["ga"] = general_accuracy(fold_results, labels_test, sex_test)
-  raw_submission_results["eo"] = equal_opportunity(fold_results, labels_test, sex_test)
-  print("Results:", raw_submission_results)
+  fold_stat_results = process_results(fold_results, labels_test, sex_test)
 
-  organised_submission_results = organise_results(name, raw_submission_results)
-
-  return organised_submission_results
+  return create_dataframe(name, fold_stat_results)
 
 def run_ayoub_ghriss_original(data_train, labels_train, data_test, labels_test, sex_test):
   name = "ayoub_ghriss_original"
@@ -495,15 +608,11 @@ def run_ayoub_ghriss_original(data_train, labels_train, data_test, labels_test, 
   download_data()
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
-  raw_submission_results = {}
+
   fold_results = train_folds(data_train, labels_train, data_test, labels_test, Classifier, FeatureExtractor)
-  raw_submission_results["ga"] = general_accuracy(fold_results, labels_test, sex_test)
-  raw_submission_results["eo"] = equal_opportunity(fold_results, labels_test, sex_test)
-  print("Results:", raw_submission_results)
+  fold_stat_results = process_results(fold_results, labels_test, sex_test)
 
-  organised_submission_results = organise_results(name, raw_submission_results)
-
-  return organised_submission_results
+  return create_dataframe(name, fold_stat_results)
 
 def run_lbg_original(data_train, labels_train, data_test, labels_test, sex_test):
   name = "lbg_original"
@@ -516,15 +625,11 @@ def run_lbg_original(data_train, labels_train, data_test, labels_test, sex_test)
   download_data()
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
-  raw_submission_results = {}
+
   fold_results = train_folds(data_train, labels_train, data_test, labels_test, Classifier, FeatureExtractor)
-  raw_submission_results["ga"] = general_accuracy(fold_results, labels_test, sex_test)
-  raw_submission_results["eo"] = equal_opportunity(fold_results, labels_test, sex_test)
-  print("Results:", raw_submission_results)
+  fold_stat_results = process_results(fold_results, labels_test, sex_test)
 
-  organised_submission_results = organise_results(name, raw_submission_results)
-
-  return organised_submission_results
+  return create_dataframe(name, fold_stat_results)
 
 def run_mk_original(data_train, labels_train, data_test, labels_test, sex_test):
   name = "mk_original"
@@ -537,17 +642,13 @@ def run_mk_original(data_train, labels_train, data_test, labels_test, sex_test):
   download_data()
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
-  raw_submission_results = {}
+
   fold_results = train_folds(data_train, labels_train, data_test, labels_test, Classifier, FeatureExtractor)
-  raw_submission_results["ga"] = general_accuracy(fold_results, labels_test, sex_test)
-  raw_submission_results["eo"] = equal_opportunity(fold_results, labels_test, sex_test)
-  print("Results:", raw_submission_results)
+  fold_stat_results = process_results(fold_results, labels_test, sex_test)
 
-  organised_submission_results = organise_results(name, raw_submission_results)
+  return create_dataframe(name, fold_stat_results)
 
-  return organised_submission_results
-
-def run_nguigui_original(data_train, labels_train, data_test, labels_test, sex_test, seed):
+def run_nguigui_original(data_train, labels_train, data_test, labels_test, sex_test):
   name = "nguigui_original"
   print(name)
   warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -559,15 +660,10 @@ def run_nguigui_original(data_train, labels_train, data_test, labels_test, sex_t
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-  raw_submission_results = {}
   fold_results = train_folds(data_train, labels_train, data_test, labels_test, Classifier, FeatureExtractor)
-  raw_submission_results["ga"] = general_accuracy(fold_results, labels_test, sex_test)
-  raw_submission_results["eo"] = equal_opportunity(fold_results, labels_test, sex_test)
-  print("Results:", raw_submission_results)
+  fold_stat_results = process_results(fold_results, labels_test, sex_test)
 
-  organised_submission_results = organise_results(name, raw_submission_results)
-
-  return organised_submission_results
+  return create_dataframe(name, fold_stat_results)
 
 def run_Slasnista_original(data_train, labels_train, data_test, labels_test, sex_test):
   name = "Slasnista_original"
@@ -580,15 +676,11 @@ def run_Slasnista_original(data_train, labels_train, data_test, labels_test, sex
   download_data()
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
-  raw_submission_results = {}
+
   fold_results = train_folds(data_train, labels_train, data_test, labels_test, Classifier, FeatureExtractor)
-  raw_submission_results["ga"] = general_accuracy(fold_results, labels_test, sex_test)
-  raw_submission_results["eo"] = equal_opportunity(fold_results, labels_test, sex_test)
-  print("Results:", raw_submission_results)
+  fold_stat_results = process_results(fold_results, labels_test, sex_test)
 
-  organised_submission_results = organise_results(name, raw_submission_results)
-
-  return organised_submission_results
+  return create_dataframe(name, fold_stat_results)
 
 def run_vzantedeschi_original(data_train, labels_train, data_test, labels_test, sex_test):
   name = "vzantedeschi_original"
@@ -601,15 +693,11 @@ def run_vzantedeschi_original(data_train, labels_train, data_test, labels_test, 
   download_data()
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
-  raw_submission_results = {}
+
   fold_results = train_folds(data_train, labels_train, data_test, labels_test, Classifier, FeatureExtractor)
-  raw_submission_results["ga"] = general_accuracy(fold_results, labels_test, sex_test)
-  raw_submission_results["eo"] = equal_opportunity(fold_results, labels_test, sex_test)
-  print("Results:", raw_submission_results)
+  fold_stat_results = process_results(fold_results, labels_test, sex_test)
 
-  organised_submission_results = organise_results(name, raw_submission_results)
-
-  return organised_submission_results
+  return create_dataframe(name, fold_stat_results)
 
 def run_wwwwmmmm_original(data_train, labels_train, data_test, labels_test, sex_test):
   name = "wwwwmmmm_original"
@@ -622,16 +710,11 @@ def run_wwwwmmmm_original(data_train, labels_train, data_test, labels_test, sex_
   download_data()
 
   warnings.filterwarnings("ignore", category=DeprecationWarning)
-  raw_submission_results = {}
+
   fold_results = train_folds(data_train, labels_train, data_test, labels_test, Classifier, FeatureExtractor)
-  raw_submission_results["ga"] = general_accuracy(fold_results, labels_test, sex_test)
-  raw_submission_results["eo"] = equal_opportunity(fold_results, labels_test, sex_test)
-  print("Results:", raw_submission_results)
+  fold_stat_results = process_results(fold_results, labels_test, sex_test)
 
-  organised_submission_results = organise_results(name, raw_submission_results)
-
-  return organised_submission_results
-
+  return create_dataframe(name, fold_stat_results)
 
 def run_tests(seed):
   np.random.seed(seed)
@@ -687,33 +770,37 @@ def run_tests(seed):
   #Display gender ratio information
   # print_gender_info()
   # gender_ratio_per_fold()
-  
+  # submissions = []
   if check_for_saved_file(seed) == False:
     #Train and test submissions
 
-    # submissions = run_pearrr_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)
-    # submissions = pd.concat([submissions, run_abethe_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
-    # submissions = pd.concat([submissions, run_amicie_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
-    # submissions = pd.concat([submissions, run_ayoub_ghriss_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
-    # submissions = pd.concat([submissions, run_lbg_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
-    # submissions = pd.concat([submissions, run_mk_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
-    submissions = run_nguigui_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test, seed)
-    # submissions = pd.concat([submissions, run_nguigui_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
-    # submissions = pd.concat([submissions, run_Slasnista_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
-    # submissions = pd.concat([submissions, run_vzantedeschi_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
-    # submissions = pd.concat([submissions, run_wwwwmmmm_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    submissions = run_pearrr_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)
+    submissions = pd.concat([submissions, run_abethe_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    submissions = pd.concat([submissions, run_amicie_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    submissions = pd.concat([submissions, run_ayoub_ghriss_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    submissions = pd.concat([submissions, run_lbg_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    submissions = pd.concat([submissions, run_mk_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    # submissions = run_nguigui_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)
+    submissions = pd.concat([submissions, run_nguigui_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    submissions = pd.concat([submissions, run_Slasnista_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    submissions = pd.concat([submissions, run_vzantedeschi_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    submissions = pd.concat([submissions, run_wwwwmmmm_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
+    save_predictions(seed, submissions)
   else:
     submissions = load_predictions(seed)
-
-  print(submissions)
-
-  create_violin_graph(submissions)
-  fig= plt.figure(figsize=(90, 10))
-  submissions["Average"].plot.bar()
-  plt.xticks(rotation = 90)
-  plt.legend(loc=(1.04, 0))
-  plt.show()
-  save_predictions(seed, submissions)
+    submissions.set_index("submission", inplace=True)
+  # for a in submissions:
+  #   for b in a:
+  #     # for c in b:
+  #     print(b.type)
+  # print(submissions)
+  # create_violin_graph(submissions)
+  # fig= plt.figure(figsize=(90, 10))
+  # submissions["Average"].plot.bar()
+  # plt.xticks(rotation = 90)
+  # plt.legend(loc=(1.04, 0))
+  # plt.show()
+  general_accuracy(submissions)
 
 def test_suite():
   x = np.random.rand()
