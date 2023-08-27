@@ -13,11 +13,9 @@ from problem import get_cv
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import cross_validate
 from sklearn.model_selection import cross_val_predict
-from sklearn. metrics import roc_auc_score
-from sklearn. metrics import roc_curve
+from sklearn import metrics
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import accuracy_score
 
 import seaborn as sns
 
@@ -92,20 +90,10 @@ def check_for_saved_file(seed):
 def save_predictions(seed, predictions):
   warnings.filterwarnings("ignore", message=".*`np.*` is a deprecated alias.*")
 
-  # with open("saved_outcomes/"+str(seed)+".txt", "w", newline = "\n") as f:
-  #   write = cs.writer(f)
-  #   for row in predictions:
-  #     write.writerow(row)
-  # f.close()
   predictions.to_csv("saved_outcomes/"+str(seed)+".txt", index = True)
 
 def load_predictions(seed):
-  # results = []
-  # with open("saved_outcomes/"+str(seed)+".txt", "r", newline = "\n") as f:
-  #   read = cs.reader(f)
-  #   for row in read:
-  #     results.append(row)
-  # return results 
+
   return pd.read_csv("saved_outcomes/"+str(seed)+".txt")
 
 def plot_auc(labels_train, predictions, name):
@@ -211,7 +199,7 @@ def train_folds(data_train, labels_train, data_test, labels_test, Classifier, Fe
 
 def create_dataframe(name, fold_stat_results):
 
-  dataframe_names = [name + "_overall", name + "_male", name + "_female"]
+  dataframe_names = [name + "-overall", name + "-male", name + "-female"]
   dataframe_contents = {"submission": dataframe_names}
 
   fold_number = 1
@@ -220,16 +208,19 @@ def create_dataframe(name, fold_stat_results):
     FP = []
     FN = []
     TN = []
+    AUC = []
     for results in fold:
       print("Fold results", results)
       TP.append(results[0])
       FP.append(results[1])
       FN.append(results[2])
       TN.append(results[3])
+      AUC.append(results[4])
     dataframe_contents["TP"+"_"+str(fold_number)] = TP.copy()
     dataframe_contents["FP"+"_"+str(fold_number)] = FP.copy()
     dataframe_contents["FN"+"_"+str(fold_number)] = FN.copy()
     dataframe_contents["TN"+"_"+str(fold_number)] = TN.copy()
+    dataframe_contents["AUC"+"_"+str(fold_number)] = AUC.copy()
     fold_number += 1
   # print(dataframe_contents)
   dataframed_results = pd.DataFrame(dataframe_contents)
@@ -239,16 +230,14 @@ def create_dataframe(name, fold_stat_results):
 def process_results(raw_results, labels, sex):
   result = []
   for predicted_results in raw_results:
-    result.append(true_positive(labels, predicted_results, sex))
+    result.append(determine_statistics(labels, predicted_results, sex))
   return result
       
-
-def true_positive(labels, results, sex):     
+def determine_statistics(labels, results, sex):     
   male_results = results[sex[0]]
   male_labels = labels[sex[0]]
   female_results = results[sex[1]]
   female_labels = labels[sex[1]]
-
 
   overall_true_positive = 0
   overall_false_positive = 0
@@ -259,7 +248,6 @@ def true_positive(labels, results, sex):
   male_false_positive = 0
   male_true_negative = 0
   male_false_negative = 0
-
 
   female_true_positive = 0
   female_false_positive = 0
@@ -300,18 +288,82 @@ def true_positive(labels, results, sex):
       female_true_negative += 1
     i += 1
 
-  return [(overall_true_positive, overall_false_positive, overall_false_negative, overall_true_negative), 
-          (male_true_positive, male_false_positive, male_false_negative, male_true_negative), 
-          (female_true_positive, female_false_positive, female_false_negative, female_true_negative)]
+  overall_fpr, overall_tpr, overall_thresholds = metrics.roc_curve(labels, results)
+  male_fpr, male_tpr, male_thresholds = metrics.roc_curve(male_labels, male_results)
+  female__fpr, female__tpr, female_thresholds = metrics.roc_curve(female_labels, female_results)
 
+  overall_auc = metrics.auc(overall_fpr, overall_tpr)
+  male_auc = metrics.auc(male_fpr, male_tpr)
+  female_auc = metrics.auc(female__fpr, female__tpr)
 
+  return [(overall_true_positive, overall_false_positive, overall_false_negative, overall_true_negative, overall_auc), 
+          (male_true_positive, male_false_positive, male_false_negative, male_true_negative, male_auc), 
+          (female_true_positive, female_false_positive, female_false_negative, female_true_negative, female_auc)]
 
-def general_accuracy(results):
-  i = 1
+def auc_roc(results, seed):
+  
   test_names = results.index.values.tolist()
   headings = results.columns.values.tolist()
+
+  auc = []
+  names = []
+
+  i = 1
+  while ("AUC"+"_"+str(i)) in headings:
+    AUC_fold = results["AUC"+"_"+str(i)].values.tolist()
+
+    j = 0
+    while j < len(AUC_fold):
+      auc.append(AUC_fold[j])
+      j += 1
+
+    k = 0
+    while k < len(test_names):
+      names.append(test_names[k]+"-"+str(i))
+      k += 1
+    i += 1
+  consolidated_test_names = []
+  auc_sex = []
+  sex = []
+
+  l = 0
+  while l < len(names):
+    split_names = str.split(names[l], "-")
+    test_name = split_names[0]
+    if split_names[1] != "overall":
+      sex.append(split_names[1])
+      consolidated_test_names.append(test_name)
+      auc_sex.append(auc[l])
+
+    l += 1
+  
+  generalised_submission_names = []
+  m = 0
+  while m < len(auc):
+    auc[m] *= 100
+    m += 1
+  
+  eo_df = pd.DataFrame({"Submissions": consolidated_test_names,
+                        "Results": auc_sex,
+                        "Sex": sex})
+
+  sns.set_theme(style="whitegrid")
+  plot = sns.violinplot(data=eo_df, x="Submissions", y="Results", split=True, hue="Sex", inner="stick")
+  plot.set_title('AUC-ROC Performance of 10 Best Submissions: Seed '+str(seed))
+  plot.set_xticklabels(plot.get_xticklabels(), rotation = 90)  
+  plot.set_xlabel('Submissions')
+  plot.set_ylabel('AUC (%)')
+  plt.show()
+
+def general_accuracy(results, seed):
+
+  test_names = results.index.values.tolist()
+  headings = results.columns.values.tolist()
+
   ga = []
   names = []
+
+  i = 1
   while ("TP"+"_"+str(i)) in headings:
     TP_fold = results["TP"+"_"+str(i)].values.tolist()
     FP_fold = results["FP"+"_"+str(i)].values.tolist()
@@ -320,68 +372,103 @@ def general_accuracy(results):
 
     j = 0
     while j < len(TP_fold):
-      ga.append((TP_fold[j] + TN_fold[j])/(TP_fold[j] + FP_fold[j] + FN_fold[j] + TN_fold[j]))
+      ga.append((TP_fold[j] + TN_fold[j]) / (TP_fold[j] + FP_fold[j] + FN_fold[j] + TN_fold[j]))
       j += 1
 
     k = 0
-    while k <len(test_names):
-      names.append(test_names[k]+"_"+str(i))
+    while k < len(test_names):
+      names.append(test_names[k]+"-"+str(i))
       k += 1
     i += 1
-  print(len(names))
-  print(len(ga))
-  fig= plt.figure(figsize=(30, 10))
-  plt.bar(names, ga)
-  plt.title('title name')
-  plt.xlabel('x_axis name')
-  plt.ylabel('y_axis name')
-  plt.xticks(rotation = 90)
-  plt.legend(loc=(1.04, 0))
+
+  consolidated_test_names = []
+  ga_sex = []
+  sex = []
+
+  l = 0
+  while l <len(names):
+    split_names = str.split(names[l], "-")
+    test_name = split_names[0]
+    if split_names[1] != "overall":
+      sex.append(split_names[1])
+      consolidated_test_names.append(test_name)
+      ga_sex.append(ga[l])
+    l += 1
+
+  eo_df = pd.DataFrame({"Submissions": consolidated_test_names,
+                        "Sex": sex,
+                        "Results": ga_sex})
+
+
+  sns.set_theme(style="whitegrid")
+  plot = sns.violinplot(data=eo_df, x="Submissions", y="Results",  split = True, hue="Sex", inner="stick")
+  plot.set_title('General Accuracy  Performance of 10 Best Submissions: Seed '+str(seed))
+  plot.set_xticklabels(plot.get_xticklabels(), rotation = 90)
+  plot.set_xlabel('Submissions')
+  plot.set_ylabel('Accuracy (%)')
+  plot.legend(loc=(0, 0))
   plt.show()
 
+def equal_opportunity(results, seed):
 
+  test_names = results.index.values.tolist()
+  headings = results.columns.values.tolist()
 
-
-
-def true_positive_rate(labels_test, predicted_labels):
-  true_positive = 0
-  false_negative = 0
-  false_positive = 0
-  true_negative = 0
-  i = 0
-
-  while i < len(labels_test):
-    if labels_test[i] == 1 and predicted_labels[i] == 1:
-      true_positive += 1
-    elif predicted_labels[i] == 0 and labels_test[i] == 1:
-      false_negative += 1
-    elif predicted_labels[i] == 1 and labels_test[i] == 0:
-      false_positive += 1
-    elif labels_test[i] == 0 and predicted_labels[i] == 0:
-      true_negative += 1
-    i += 1
-  print("TP:", true_positive, "FP:", false_positive, "FN:", false_negative, "TN:", true_negative, "Total:", true_positive+false_positive+false_negative+true_negative)
-  if (true_positive + false_negative) != 0:
-    return true_positive/(true_positive + false_negative)
-  else:
-    return 0
-    
-
-def equal_opportunity(training_results, labels_test, sex_test):
-  fold_results = {}
+  tpr = []
+  names = []  
+  
   i = 1
-  for predicted_labels in training_results:
-    eo_results = {}
-    # ga_results["overall"] = true_positive_rate(labels_test, predicted_labels)
+  while ("TP"+"_"+str(i)) in headings:
+    TP_fold = results["TP"+"_"+str(i)].values.tolist()
+    # FP_fold = results["FP"+"_"+str(i)].values.tolist()
+    FN_fold = results["FN"+"_"+str(i)].values.tolist()
+    # TN_fold = results["TN"+"_"+str(i)].values.tolist()
 
-    male_results = predicted_labels[sex_test[0]]
-    female_results = predicted_labels[sex_test[1]]
-    eo_results["overall"] = true_positive_rate(labels_test[sex_test[0]], male_results) - true_positive_rate(labels_test[sex_test[1]], female_results)
-    
-    fold_results[i] = eo_results.copy()
+    j = 0
+    while j < len(TP_fold):
+      tpr.append(TP_fold[j]/(TP_fold[j] + FN_fold[j]))
+      j += 1
+
+    k = 0
+    while k < len(test_names):
+      names.append(test_names[k]+"-"+str(i))
+      k += 1
     i += 1
 
-  return(fold_results)
+  consolidated_test_names = []
+  eo = []
+
+  l = 0
+  while l <len(names):
+    split_names = str.split(names[l], "-")
+    test_name = split_names[0]+"-"+split_names[2]
+    if split_names[1] != "overall":
+      if test_name not in consolidated_test_names:
+        consolidated_test_names.append(test_name)
+        eo.append(tpr[l])
+      else:
+        eo[consolidated_test_names.index(test_name)] -= tpr[l]
+    l += 1
+  
+  generalised_submission_names = []
+  m = 0
+  while m < len(eo):
+    eo[m] *= 100
+    consolidated_test_names_split = str.split(consolidated_test_names[m], "-")
+    generalised_submission_names.append(consolidated_test_names_split[0])
+    m += 1
+  
+  eo_df = pd.DataFrame({"Submissions": generalised_submission_names,
+                        "Results": eo})
+
+  # print(eo_df)
+  sns.set_theme(style="whitegrid")
+  plot = sns.violinplot(data=eo_df, x="Submissions", y="Results",  split = True, inner="stick")
+  plot.set_title('Equal Opportunity Performance of 10 Best Submissions: Seed '+str(seed))
+  plot.set_xticklabels(plot.get_xticklabels(), rotation = 90)  
+  plot.set_xlabel('Submissions')
+  plot.set_ylabel('Equal Opportunity (%)')
+  plt.show()
 
 def separate_test_suite(overall_set, overall_labels):
   # print(overall_labels.size)
@@ -407,7 +494,6 @@ def separate_test_suite(overall_set, overall_labels):
   # print(test_dataset.info())
   return train_dataset, overall_labels[train_indices], test_dataset, overall_labels[test_indices]
 
-  
 def determine_test_sample_indices(overall_set, overall_labels):
 
   test_data = []
@@ -509,41 +595,6 @@ def organise_results(name, raw_submission_results):
   # print(organised_results.index)
   # print(organised_results)
   return organised_results
-
-def create_violin_graph(submission_results):
-  sns.set(style="darkgrid", rc={'figure.figsize':(90, 10)})
-  stuff = []
-  index = submission_results.index.values.tolist()
-  i = 0
-  while i < len(submission_results.drop("Average", axis = 1).index):
-    stuff.append(submission_results.drop("Average", axis = 1).iloc[i].to_numpy().transpose())
-    print(i, index[i], stuff[i])
-    i+=1
-  results = pd.DataFrame(columns = ['test', 'results'])
-  i = 0
-  while i < len(index):
-    j = 0
-    while j < len(stuff[i]):
-      container = pd.DataFrame({
-        'test': [index[i]],
-        'results': [stuff[i][j]]
-        })
-      results = pd.concat([results, container.copy()])
-      j+=1
-    i+=1
-
-  
-  # print(len(index))
-  # print(len(stuff))
-  print(results)
-  # plot
-  # print(submission_results.drop("Average", axis = 1))
-  # print(stuff)
-  plot = sns.violinplot(data = results, x = results['test'], y=results['results'])
-# keys = group_results["Average"].index
-# values = group_results["Average"]
-  plot.set_xticklabels(plot.get_xticklabels(), rotation = 90)
-  plt.show()
 
 #Functions to run each submission
 def run_pearrr_original(data_train, labels_train, data_test, labels_test, sex_test):
@@ -793,14 +844,16 @@ def run_tests(seed):
   #   for b in a:
   #     # for c in b:
   #     print(b.type)
-  # print(submissions)
+  print(submissions)
   # create_violin_graph(submissions)
   # fig= plt.figure(figsize=(90, 10))
   # submissions["Average"].plot.bar()
   # plt.xticks(rotation = 90)
   # plt.legend(loc=(1.04, 0))
   # plt.show()
-  general_accuracy(submissions)
+  auc_roc(submissions, seed)
+  general_accuracy(submissions, seed)
+  equal_opportunity(submissions, seed)
 
 def test_suite():
   x = np.random.rand()
