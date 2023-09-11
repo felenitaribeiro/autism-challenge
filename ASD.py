@@ -21,7 +21,7 @@ import seaborn as sns
 
 import matplotlib.pyplot as plt
 
-from os.path import exists
+import os as os
 
 import csv as cs
 
@@ -85,84 +85,14 @@ def initialise_predictions(data_train, labels_train, Classifier, FeatureExtracto
   return evaluation_predict(data_train, labels_train, Classifier, FeatureExtractor)
 
 def check_for_saved_file(seed):
-  return exists("saved_outcomes/"+str(seed)+".txt")
+  return os.path.exists("saved_outcomes/"+str(seed)+".txt")
 
 def save_predictions(seed, predictions):
   warnings.filterwarnings("ignore", message=".*`np.*` is a deprecated alias.*")
-
   predictions.to_csv("saved_outcomes/"+str(seed)+".txt", index = True)
 
 def load_predictions(seed):
-
   return pd.read_csv("saved_outcomes/"+str(seed)+".txt")
-
-def plot_auc(labels_train, predictions, name):
-  #define auc-roc score
-  auc_roc_score = roc_auc_score(labels_train, predictions)
-
-  #print decimal value
-  print("AUC-ROC Score:", auc_roc_score)
-
-  #determine false positive rate and true positive rate
-  fpr, tpr, thresholds = roc_curve(labels_train, predictions)
-
-  # Plotting the AUC-ROC curve
-  plt.plot(fpr, tpr, label='AUC = %0.3f' % auc_roc_score)
-  plt.plot([0, 1], [0, 1], 'k--')  # Diagonal line representing random guessing
-  plt.xlabel('False Positive Rate')
-  plt.ylabel('True Positive Rate')
-  plt.title('AUC-ROC Curve for ' + name)
-  plt.legend(loc='lower right')
-  plt.show()
-  return auc_roc_score
-
-def general_accuracy_old(predictions, data_train, labels_train, seed):
-  
-  # print("General Accurracy: True Positive and True Negative Accuracy")
-  # print(predictions)
-  # print(cv_split)
-  # print(data_train)
-  # print(labels_train)
-
-  warnings.filterwarnings("ignore", message=".*`np.*` is a deprecated alias.*")
-  cv_ga = StratifiedKFold(n_splits=5, shuffle = True, random_state = seed) 
-  cv_ga_split = cv_ga.split(data_train, labels_train)
-
-  fold_pred = [predictions[test] for train, test in cv_ga.split(data_train, labels_train)]
-  fold_labels = [np.array(labels_train)[test] for train, test in cv_ga.split(data_train, labels_train)]
-  data_train_sex = np.array(data_train['participants_sex'])
-  i = 0
-  fold_results = []
-  for train_index, test_index in cv_ga_split:
-
-    male_accuracy = 0
-    male_total = 0
-    female_accuracy = 0
-    female_total = 0
-
-    train = data_train_sex[train_index]
-    test = data_train_sex[test_index]
-
-    for index in range(len(fold_pred[i])): 
-      if test[index] == 'M':
-        male_total += 1
-        if round(fold_pred[i][index]) == fold_labels[i][index]:
-          male_accuracy += 1
-      else:
-        female_total += 1
-        if round(fold_pred[i][index]) == fold_labels[i][index]:
-          female_accuracy += 1
-    i += 1
-    male_ga = round(male_accuracy/male_total*100, 2)
-    female_ga = round(female_accuracy/female_total*100, 2)
-    ga_score = male_ga-female_ga
-    print("Male: ", male_accuracy, " out of ", male_total,", ", male_ga, "%. Female: ", female_accuracy, " out of ", female_total, ", ", female_ga, "%. Total participants: ", female_total + male_total, sep="")
-    if ga_score != 0:
-      fold_results.append((np.abs(round(ga_score, 2)), round(abs(ga_score)/-ga_score))) #1 = F, -1 = M
-    else:
-      fold_results.append((np.abs(round(ga_score, 2)), 0)) #1 = F, -1 = M
-  # print("Fold Results: ", fold_results)
-  return fold_results
 
 def train_folds(data_train, labels_train, data_test, labels_test, Classifier, FeatureExtractor):
   #Create crossvalidation code
@@ -288,13 +218,9 @@ def determine_statistics(labels, results, sex):
       female_true_negative += 1
     i += 1
 
-  overall_fpr, overall_tpr, overall_thresholds = metrics.roc_curve(labels, results)
-  male_fpr, male_tpr, male_thresholds = metrics.roc_curve(male_labels, male_results)
-  female__fpr, female__tpr, female_thresholds = metrics.roc_curve(female_labels, female_results)
-
-  overall_auc = metrics.auc(overall_fpr, overall_tpr)
-  male_auc = metrics.auc(male_fpr, male_tpr)
-  female_auc = metrics.auc(female__fpr, female__tpr)
+  overall_auc = metrics.roc_auc_score(labels, results)
+  male_auc = metrics.roc_auc_score(male_labels, male_results)
+  female_auc = metrics.roc_auc_score(female_labels, female_results)
 
   return [(overall_true_positive, overall_false_positive, overall_false_negative, overall_true_negative, overall_auc), 
           (male_true_positive, male_false_positive, male_false_negative, male_true_negative, male_auc), 
@@ -337,7 +263,6 @@ def auc_roc(results, seed):
 
     l += 1
   
-  generalised_submission_names = []
   m = 0
   while m < len(auc):
     auc[m] *= 100
@@ -353,6 +278,8 @@ def auc_roc(results, seed):
   plot.set_xticklabels(plot.get_xticklabels(), rotation = 90)  
   plot.set_xlabel('Submissions')
   plot.set_ylabel('AUC (%)')
+  plot.legend(loc=(1.040, 0.5))
+  plt.savefig('results/Seeded Results/'+str(seed)+'/auc_roc.png', bbox_inches="tight")
   plt.show()
 
 def general_accuracy(results, seed):
@@ -395,18 +322,19 @@ def general_accuracy(results, seed):
       ga_sex.append(ga[l])
     l += 1
 
-  eo_df = pd.DataFrame({"Submissions": consolidated_test_names,
+  ga_df = pd.DataFrame({"Submissions": consolidated_test_names,
                         "Sex": sex,
                         "Results": ga_sex})
 
 
   sns.set_theme(style="whitegrid")
-  plot = sns.violinplot(data=eo_df, x="Submissions", y="Results",  split = True, hue="Sex", inner="stick")
+  plot = sns.violinplot(data=ga_df, x="Submissions", y="Results",  split = True, hue="Sex", inner="stick")
   plot.set_title('General Accuracy  Performance of 10 Best Submissions: Seed '+str(seed))
   plot.set_xticklabels(plot.get_xticklabels(), rotation = 90)
   plot.set_xlabel('Submissions')
   plot.set_ylabel('Accuracy (%)')
-  plot.legend(loc=(0, 0))
+  plot.legend(loc=(1.040, 0.5))
+  plt.savefig('results/Seeded Results/'+str(seed)+'/ga.png', bbox_inches="tight")
   plt.show()
 
 def equal_opportunity(results, seed):
@@ -468,6 +396,8 @@ def equal_opportunity(results, seed):
   plot.set_xticklabels(plot.get_xticklabels(), rotation = 90)  
   plot.set_xlabel('Submissions')
   plot.set_ylabel('Equal Opportunity (%)')
+  plt.savefig('results/Seeded Results/'+str(seed)+'/eo.png', bbox_inches="tight")
+  # plot.legend(loc=(1.040, 0.5))
   plt.show()
 
 def separate_test_suite(overall_set, overall_labels):
@@ -769,6 +699,22 @@ def run_wwwwmmmm_original(data_train, labels_train, data_test, labels_test, sex_
 
 def run_tests(seed):
   np.random.seed(seed)
+    
+  try:
+    os.mkdir("results")
+  except OSError as error:
+    print("results folder exists already, punk")
+
+  try:
+    os.mkdir("results/Seeded Results")
+  except OSError as error:
+    print("Seeded Results folder exists already, punk")
+
+  try:
+    os.mkdir("results/Seeded Results/"+str(seed))
+  except OSError as error:
+    print("Folder " + str(seed) + " exists already, punk")
+
   #Load data
   warnings.filterwarnings("ignore", category=DeprecationWarning)
   data_train, labels_train, data_test, labels_test = load_data()
@@ -943,5 +889,8 @@ def test_suite():
 # plt.legend(loc=(1.04, 0))
 # plt.show()
 
-random_seed = 42
-run_tests(random_seed)
+run_tests(11)
+run_tests(11*11)
+run_tests(11*11*11)
+run_tests(11*11*11*11)
+run_tests(11*11*11*11*11)
