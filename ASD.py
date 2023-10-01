@@ -259,7 +259,7 @@ def auc_roc(results, seed):
     if split_names[1] != "overall":
       sex.append(split_names[1])
       consolidated_test_names.append(test_name)
-      auc_sex.append(auc[l])
+      auc_sex.append(auc[l]*100)
 
     l += 1
   
@@ -319,7 +319,7 @@ def general_accuracy(results, seed):
     if split_names[1] != "overall":
       sex.append(split_names[1])
       consolidated_test_names.append(test_name)
-      ga_sex.append(ga[l])
+      ga_sex.append(ga[l]*100)
     l += 1
 
   ga_df = pd.DataFrame({"Submissions": consolidated_test_names,
@@ -337,20 +337,19 @@ def general_accuracy(results, seed):
   plt.savefig('results/Seeded Results/'+str(seed)+'/ga.png', bbox_inches="tight")
   plt.show()
 
-def equal_opportunity(results, seed):
+def equalised_odds(results, seed):
 
   test_names = results.index.values.tolist()
   headings = results.columns.values.tolist()
 
+  #tpr
   tpr = []
-  names = []  
+  names_tpr = []  
   
   i = 1
   while ("TP"+"_"+str(i)) in headings:
     TP_fold = results["TP"+"_"+str(i)].values.tolist()
-    # FP_fold = results["FP"+"_"+str(i)].values.tolist()
     FN_fold = results["FN"+"_"+str(i)].values.tolist()
-    # TN_fold = results["TN"+"_"+str(i)].values.tolist()
 
     j = 0
     while j < len(TP_fold):
@@ -359,46 +358,98 @@ def equal_opportunity(results, seed):
 
     k = 0
     while k < len(test_names):
-      names.append(test_names[k]+"-"+str(i))
+      names_tpr.append(test_names[k]+"-"+str(i))
       k += 1
     i += 1
 
-  consolidated_test_names = []
-  eo = []
+  consolidated_test_names_tpr = []
+  eo_tpr = []
+  eo_tpr_fpr = []
 
   l = 0
-  while l <len(names):
-    split_names = str.split(names[l], "-")
+  while l <len(names_tpr):
+    split_names = str.split(names_tpr[l], "-")
     test_name = split_names[0]+"-"+split_names[2]
     if split_names[1] != "overall":
-      if test_name not in consolidated_test_names:
-        consolidated_test_names.append(test_name)
-        eo.append(tpr[l])
+      if test_name not in consolidated_test_names_tpr:
+        consolidated_test_names_tpr.append(test_name)
+        eo_tpr.append(tpr[l])
+        eo_tpr_fpr.append("tpr")
       else:
-        eo[consolidated_test_names.index(test_name)] -= tpr[l]
+        eo_tpr[consolidated_test_names_tpr.index(test_name)] -= tpr[l]
     l += 1
   
+  #fpr
+  fpr = []
+  names_fpr = []  
+  
+  i = 1
+  while ("TP"+"_"+str(i)) in headings:
+    FP_fold = results["FP"+"_"+str(i)].values.tolist()
+    TN_fold = results["TN"+"_"+str(i)].values.tolist()
+
+    j = 0
+    while j < len(FP_fold):
+      fpr.append(FP_fold[j]/(FP_fold[j] + TN_fold[j]))
+      j += 1
+
+    k = 0
+    while k < len(test_names):
+      names_fpr.append(test_names[k]+"-"+str(i))
+      k += 1
+    i += 1
+
+  consolidated_test_names_fpr = []
+  eo_fpr = []
+
+  l = 0
+  while l <len(names_fpr):
+    split_names = str.split(names_fpr[l], "-")
+    test_name = split_names[0]+"-"+split_names[2]
+    if split_names[1] != "overall":
+      if test_name not in consolidated_test_names_fpr:
+        consolidated_test_names_fpr.append(test_name)
+        eo_fpr.append(fpr[l])
+        eo_tpr_fpr.append("fpr")
+      else:
+        eo_fpr[consolidated_test_names_fpr.index(test_name)] -= fpr[l]
+    l += 1
+
   generalised_submission_names = []
   m = 0
-  while m < len(eo):
-    eo[m] *= 100
-    consolidated_test_names_split = str.split(consolidated_test_names[m], "-")
+
+  while m < len(eo_tpr):
+    eo_tpr[m] *= 100
+
+    consolidated_test_names_split = str.split(consolidated_test_names_tpr[m], "-")
     generalised_submission_names.append(consolidated_test_names_split[0])
     m += 1
+
+  m = 0
+  while m < len(eo_fpr):
+    eo_fpr[m] *= 100
+
+    consolidated_test_names_split = str.split(consolidated_test_names_fpr[m], "-")
+    generalised_submission_names.append(consolidated_test_names_split[0])
+    m += 1
+
+  print(len(generalised_submission_names), len(np.concatenate([eo_tpr, eo_fpr])), len(eo_tpr_fpr))
   
   eo_df = pd.DataFrame({"Submissions": generalised_submission_names,
-                        "Results": eo})
+                        "Equalised Odds Results": np.concatenate([eo_tpr, eo_fpr]), 
+                        "TPR:FPR": eo_tpr_fpr})
 
   # print(eo_df)
   sns.set_theme(style="whitegrid")
-  plot = sns.violinplot(data=eo_df, x="Submissions", y="Results",  split = True, inner="stick")
-  plot.set_title('Equal Opportunity Performance of 10 Best Submissions: Seed '+str(seed))
+  plot = sns.violinplot(data=eo_df, x="Submissions", y="Equalised Odds Results",  split = True, hue = "TPR:FPR", inner="stick")
+  plot.set_title('Equalised Odds Results Performance of 10 Best Submissions: Seed '+str(seed))
   plot.set_xticklabels(plot.get_xticklabels(), rotation = 90)  
   plot.set_xlabel('Submissions')
-  plot.set_ylabel('Equal Opportunity (%)')
+  plot.set_ylabel('True Positive Rate/False Positive Rate (%)')
   plt.savefig('results/Seeded Results/'+str(seed)+'/eo.png', bbox_inches="tight")
   # plot.legend(loc=(1.040, 0.5))
   plt.show()
+
 
 def separate_test_suite(overall_set, overall_labels):
   # print(overall_labels.size)
@@ -698,7 +749,7 @@ def run_wwwwmmmm_original(data_train, labels_train, data_test, labels_test, sex_
   return create_dataframe(name, fold_stat_results)
 
 def run_tests(seed):
-  np.random.seed(seed)
+  np.random.default_rng(seed=42)
     
   try:
     os.mkdir("results")
@@ -743,6 +794,12 @@ def run_tests(seed):
   # print(new_test_dataset.head(5))
 
   sex_test = sex_index_split(new_test_dataset)
+
+  # check_state =  np.random.get_state()
+  # check_seed = check_state[1][0]
+  # check_seed = np.random.get_state()
+  # print("Yo, the test set was developed with random seed: ", check_seed)
+
   # print(sex_test)
   #Check uniqueness of training and test datasets
   # print(determine_unique_dataframe(new_train_dataset, new_test_dataset))
@@ -770,7 +827,8 @@ def run_tests(seed):
   # submissions = []
   if check_for_saved_file(seed) == False:
     #Train and test submissions
-
+    np.random.default_rng(seed=seed)
+    
     submissions = run_pearrr_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)
     submissions = pd.concat([submissions, run_abethe_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
     submissions = pd.concat([submissions, run_amicie_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)])
@@ -799,8 +857,13 @@ def run_tests(seed):
   # plt.show()
   auc_roc(submissions, seed)
   general_accuracy(submissions, seed)
-  equal_opportunity(submissions, seed)
+  equalised_odds(submissions, seed)
 
+  # check_state =  np.random.get_state()
+  # check_seed = check_state[1][0]
+  # check_seed = np.random.get_state()
+  # print("Yo, the submissions were developed with random seed: ", check_seed)
+  
 def test_suite():
   x = np.random.rand()
   # x = 1
@@ -889,6 +952,7 @@ def test_suite():
 # plt.legend(loc=(1.04, 0))
 # plt.show()
 
+# run_tests(12)
 run_tests(11)
 run_tests(11*11)
 run_tests(11*11*11)
