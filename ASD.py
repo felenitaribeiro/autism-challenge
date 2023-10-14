@@ -87,12 +87,88 @@ def initialise_predictions(data_train, labels_train, Classifier, FeatureExtracto
 def check_for_saved_file(seed):
   return os.path.exists("saved_outcomes/"+str(seed)+".txt")
 
+def check_for_test_dataset(seed):
+  try:
+    os.mkdir("datasets/"+str(seed))
+  except OSError as error:
+    # print(error, "yes")
+    return True
+  return False
+  
+
 def save_predictions(seed, predictions):
   warnings.filterwarnings("ignore", message=".*`np.*` is a deprecated alias.*")
   predictions.to_csv("saved_outcomes/"+str(seed)+".txt", index = True)
 
+def save_datasets(seed, new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test):
+  warnings.filterwarnings("ignore", message=".*`np.*` is a deprecated alias.*")
+  new_train_dataset.to_csv("datasets/" + str(seed) + "/train_dataset_" + str(seed) + ".txt", index = True)
+  new_test_dataset.to_csv("datasets/" + str(seed) + "/test_dataset_" + str(seed) + ".txt", index = True)
+
+  # print(new_train_labels)
+  with open("datasets/" + str(seed) + "/train_labels_" + str(seed) + ".txt", 'w') as filehandle:
+    filehandle.writelines(f"{train_labels}\n" for train_labels in new_train_labels)
+
+  with open("datasets/" + str(seed) + "/test_labels_" + str(seed) + ".txt", 'w') as filehandle:
+    filehandle.writelines(f"{test_labels}\n" for test_labels in new_test_labels)
+
+  # with open("datasets/" + str(seed) + "/sex_test_" + str(seed) + ".txt", 'w') as filehandle:
+  #   for sex_test_index in sex_test:
+  #     filehandle.writelines(f"{sex}\n" for sex in sex_test_index) 
+
+  with open("datasets/" + str(seed) + "/sex_test_" + str(seed) + ".txt", 'w') as filehandle:
+      filehandle.writelines(f"{sex}\n" for sex in sex_test) 
+
+
 def load_predictions(seed):
   return pd.read_csv("saved_outcomes/"+str(seed)+".txt")
+
+def load_datasets(seed):
+  train_dataset = pd.read_csv("datasets/" + str(seed) + "/train_dataset_"+str(seed)+".txt")
+  test_dataset = pd.read_csv("datasets/" + str(seed) + "/test_dataset_"+str(seed)+".txt")
+  # print(train_dataset)
+  train_dataset.set_index("subject_id", inplace=True)
+  test_dataset.set_index("subject_id", inplace=True)
+
+  train_labels = []
+  test_labels = []
+  sex_test = []
+
+  with open("datasets/" + str(seed) + "/train_labels_" + str(seed) + ".txt", 'r') as filehandle:
+
+    for line in filehandle:
+      line = line.strip()
+      train_label = int(line)
+      train_labels.append(train_label)
+
+  # print(train_labels)
+
+  with open("datasets/" + str(seed) + "/test_labels_" + str(seed) + ".txt", 'r') as filehandle:
+
+    for line in filehandle:
+      line = line.strip()
+      test_label = int(line)
+      test_labels.append(test_label)
+ 
+  with open("datasets/" + str(seed) + "/sex_test_" + str(seed) + ".txt", 'r') as filehandle:
+    for line in filehandle:
+      line = line.strip()
+      values = line.replace('[', '').replace(']', '').split(",")
+      sex_row = [int(value) for value in values]
+      sex_test.append(np.array(sex_row))
+
+  # with open("datasets/" + str(seed) + "/test_labels_" + str(seed) + ".txt", 'r') as filehandle:
+  #   for line in filehandle:
+  #     marker = line[:-1]
+  #     test_labels.append(marker)
+
+  # with open("datasets/" + str(seed) + "/sex_test_" + str(seed) + ".txt", 'r') as filehandle:
+  #   for line in filehandle:
+  #     marker = line[:-1]
+  #     sex_test.append(marker)
+
+  return train_dataset, np.array(train_labels), test_dataset, np.array(test_labels), np.array(sex_test)
+  
 
 def train_folds(data_train, labels_train, data_test, labels_test, Classifier, FeatureExtractor):
   #Create crossvalidation code
@@ -108,7 +184,7 @@ def train_folds(data_train, labels_train, data_test, labels_test, Classifier, Fe
 
     train_dataset.loc[:, data_train.columns] = data_train.loc[dataframe_indices[train]] #Copy all dataframe information w.r.t key values
     train_dataset.index.name = "subject_id"
-
+    # print(type(train))
     train_labels = labels_train[train]
     
     #Train the model on the full training dataset
@@ -226,8 +302,8 @@ def determine_statistics(labels, results, sex):
           (male_true_positive, male_false_positive, male_false_negative, male_true_negative, male_auc), 
           (female_true_positive, female_false_positive, female_false_negative, female_true_negative, female_auc)]
 
-def auc_roc(results, seed):
-  
+def auc_roc(results):
+  # print(type(results), results)
   test_names = results.index.values.tolist()
   headings = results.columns.values.tolist()
 
@@ -268,12 +344,14 @@ def auc_roc(results, seed):
     auc[m] *= 100
     m += 1
   
-  eo_df = pd.DataFrame({"Submissions": consolidated_test_names,
+  auc_df = pd.DataFrame({"Submissions": consolidated_test_names,
                         "Results": auc_sex,
                         "Sex": sex})
+  return auc_df
 
+def plot_auc_df(auc_df, seed):
   sns.set_theme(style="whitegrid")
-  plot = sns.violinplot(data=eo_df, x="Submissions", y="Results", split=True, hue="Sex", inner="stick")
+  plot = sns.violinplot(data=auc_df, x="Submissions", y="Results", split=True, hue="Sex", inner="stick")
   plot.set_title('AUC-ROC Performance of 10 Best Submissions: Seed '+str(seed))
   plot.set_xticklabels(plot.get_xticklabels(), rotation = 90)  
   plot.set_xlabel('Submissions')
@@ -282,7 +360,7 @@ def auc_roc(results, seed):
   plt.savefig('results/Seeded Results/'+str(seed)+'/auc_roc.png', bbox_inches="tight")
   plt.show()
 
-def general_accuracy(results, seed):
+def general_accuracy(results):
 
   test_names = results.index.values.tolist()
   headings = results.columns.values.tolist()
@@ -323,10 +401,13 @@ def general_accuracy(results, seed):
     l += 1
 
   ga_df = pd.DataFrame({"Submissions": consolidated_test_names,
-                        "Sex": sex,
-                        "Results": ga_sex})
+                        "Results": ga_sex,
+                        "Sex": sex
+                        })
 
+  return ga_df
 
+def plot_ga_df(ga_df, seed):
   sns.set_theme(style="whitegrid")
   plot = sns.violinplot(data=ga_df, x="Submissions", y="Results",  split = True, hue="Sex", inner="stick")
   plot.set_title('General Accuracy  Performance of 10 Best Submissions: Seed '+str(seed))
@@ -337,7 +418,7 @@ def general_accuracy(results, seed):
   plt.savefig('results/Seeded Results/'+str(seed)+'/ga.png', bbox_inches="tight")
   plt.show()
 
-def equalised_odds(results, seed):
+def equalised_odds(results):
 
   test_names = results.index.values.tolist()
   headings = results.columns.values.tolist()
@@ -433,15 +514,19 @@ def equalised_odds(results, seed):
     generalised_submission_names.append(consolidated_test_names_split[0])
     m += 1
 
-  print(len(generalised_submission_names), len(np.concatenate([eo_tpr, eo_fpr])), len(eo_tpr_fpr))
+  # print(len(generalised_submission_names), len(np.concatenate([eo_tpr, eo_fpr])), len(eo_tpr_fpr))
   
   eo_df = pd.DataFrame({"Submissions": generalised_submission_names,
-                        "Equalised Odds Results": np.concatenate([eo_tpr, eo_fpr]), 
+                        "Results": np.concatenate([eo_tpr, eo_fpr]), 
                         "TPR:FPR": eo_tpr_fpr})
 
+  return eo_df
   # print(eo_df)
+
+
+def plot_eo_df(eo_df, seed):
   sns.set_theme(style="whitegrid")
-  plot = sns.violinplot(data=eo_df, x="Submissions", y="Equalised Odds Results",  split = True, hue = "TPR:FPR", inner="stick")
+  plot = sns.violinplot(data=eo_df, x="Submissions", y="Results",  split = True, hue = "TPR:FPR", inner="stick")
   plot.set_title('Equalised Odds Results Performance of 10 Best Submissions: Seed '+str(seed))
   plot.set_xticklabels(plot.get_xticklabels(), rotation = 90)  
   plot.set_xlabel('Submissions')
@@ -748,9 +833,31 @@ def run_wwwwmmmm_original(data_train, labels_train, data_test, labels_test, sex_
 
   return create_dataframe(name, fold_stat_results)
 
-def run_tests(seed):
+def develop_test_set(seed):
+  # print(check_for_test_dataset(seed))
+  if check_for_test_dataset(seed) == False:
+    #Load data
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    data_train, labels_train, data_test, labels_test = load_data()
+
+    # merge provided training datasets and testing datasets
+    merged_dataset, merged_labels = join_original_datasets(data_train, labels_train, data_test, labels_test)
+
+    #Generate randomised test dataset and remove from training dataset.
+    new_train_dataset, new_train_labels, new_test_dataset, new_test_labels = separate_test_suite(merged_dataset, merged_labels)
+
+    sex_test = sex_index_split(new_test_dataset)
+    save_datasets(seed, new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)
+  else:
+    new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test = load_datasets(seed)
+
+
+  return new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test
+
+
+def run_tests(seed, new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test):
   np.random.default_rng(seed=42)
-    
+  
   try:
     os.mkdir("results")
   except OSError as error:
@@ -766,9 +873,7 @@ def run_tests(seed):
   except OSError as error:
     print("Folder " + str(seed) + " exists already, punk")
 
-  #Load data
-  warnings.filterwarnings("ignore", category=DeprecationWarning)
-  data_train, labels_train, data_test, labels_test = load_data()
+
 
   #Display initial dataset information
   # print(data_train.info())
@@ -781,19 +886,7 @@ def run_tests(seed):
   # print(data_test["participants_site"].value_counts().sort_index())
 
   #Merge both intial datasets to preserve all datasets
-  merged_dataset, merged_labels = join_original_datasets(data_train, labels_train, data_test, labels_test)
 
-  #Display information regarding merged dataset
-  # print(merged_dataset.info())
-  # print(merged_labels.size)
-  # print(merged_dataset["participants_site"].value_counts().sort_index()) #34
-  # print(merged_dataset.index)
-
-  #Generate randomised test dataset and remove from training dataset.
-  new_train_dataset, new_train_labels, new_test_dataset, new_test_labels = separate_test_suite(merged_dataset, merged_labels)
-  # print(new_test_dataset.head(5))
-
-  sex_test = sex_index_split(new_test_dataset)
 
   # check_state =  np.random.get_state()
   # check_seed = check_state[1][0]
@@ -824,7 +917,10 @@ def run_tests(seed):
   #Display gender ratio information
   # print_gender_info()
   # gender_ratio_per_fold()
-  # submissions = []
+  submissions = []
+
+ 
+
   if check_for_saved_file(seed) == False:
     #Train and test submissions
     np.random.default_rng(seed=seed)
@@ -848,21 +944,136 @@ def run_tests(seed):
   #   for b in a:
   #     # for c in b:
   #     print(b.type)
-  print(submissions)
+  # print(submissions)
   # create_violin_graph(submissions)
   # fig= plt.figure(figsize=(90, 10))
   # submissions["Average"].plot.bar()
   # plt.xticks(rotation = 90)
   # plt.legend(loc=(1.04, 0))
   # plt.show()
-  auc_roc(submissions, seed)
-  general_accuracy(submissions, seed)
-  equalised_odds(submissions, seed)
+  auc_results = auc_roc(submissions)
+  ga_results = general_accuracy(submissions)
+  eo_results = equalised_odds(submissions)
+  # plot_auc_df(auc_results, seed)
+  # plot_ga_df(ga_results, seed)
+  # plot_eo_df(eo_results, seed)
 
-  # check_state =  np.random.get_state()
-  # check_seed = check_state[1][0]
-  # check_seed = np.random.get_state()
-  # print("Yo, the submissions were developed with random seed: ", check_seed)
+  # auc_results['seed'] = seed
+  # ga_results['seed'] = seed
+  # eo_results['seed'] = seed
+
+  return auc_results, ga_results, eo_results
+  
+def create_ridgeline(seeds):
+  seed_auc = []
+  seed_ga = []
+  seed_eo = []
+
+  new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test = develop_test_set(42)
+
+  #collect all the test results for each auc, ga and eo.
+  for seed in seeds:
+    new_tests = run_tests(seed, new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)
+    seed_auc.append(new_tests[0])
+    seed_ga.append(new_tests[1])
+    seed_eo.append(new_tests[2])
+
+  # print(seed_auc[0]) #should be the first auc results of the first seed.
+  # print(seed_auc)
+  i = 0
+  merged_seed_auc = seed_auc[i]
+  merged_seed_ga = seed_ga[i]
+  merged_seed_eo = seed_eo[i]
+  while i < len(seeds)-1:
+    merged_seed_auc = pd.concat([merged_seed_auc, seed_auc[i+1]])
+    merged_seed_auc = pd.concat([merged_seed_ga, seed_ga[i+1]])
+    merged_seed_auc = pd.concat([merged_seed_eo, seed_eo[i+1]])
+    i+=1
+  # print(merged_seed_auc) #Should be len(seeds)*
+
+  # plt.figure(figsize = (8, 5))
+
+  # categories = merged_seed_auc['Submissions'].unique()
+
+  # for category in categories:
+  #   subset = merged_seed_auc[merged_seed_auc['Submissions'] == category]
+  #   sns.kdeplot(data=subset["Results"], label=category, shade = True)
+
+  submission_dict = {}
+  submission_names = seed_auc[0]["Submissions"].unique()
+  # print(submission_names)
+  i = 0
+  for name in submission_names:
+    submission_dict[i] = name
+    i+=1
+  # print(submission_dict)
+
+  sns.set_theme(style="white", rc={"axes.facecolor": (0, 0, 0, 0)}) 
+  # we generate a color palette with Seaborn.color_palette()
+  pal = sns.cubehelix_palette(10, rot=-.25, light=.7)
+
+  # in the sns.FacetGrid class, the 'hue' argument is the one that is the one that will be represented by colors with 'palette'
+  # g = sns.FacetGrid(merged_seed_auc, row='Submissions', aspect = 15, height = 1, palette = pal)
+  g = sns.FacetGrid(merged_seed_eo, row="Submissions", hue="Submissions", aspect=15, height=1, palette=pal)
+  
+  # then we add the densities kdeplots for each month
+  # g.map(sns.kdeplot, 'Results', bw_adjust = 1, clip_on=False, fill=True, alpha=1, linewidth=1.5) 
+  g.map(sns.kdeplot, "Results", bw_adjust=.5, clip_on=False, fill=True, alpha=1, linewidth=1.5)
+
+  # here we add a white line that represents the contour of each kdeplot
+  # g.map(sns.kdeplot, 'Results', bw_adjust=1, clip_on=False, color="w", lw=2)
+  
+  # here we add a horizontal line for each plot
+  # g.map(plt.axhline, y=0, lw=2, clip_on=False)
+  g.map(sns.kdeplot, "Results", clip_on=False, color="w", lw=2, bw_adjust=.5)
+
+
+  g.refline(y=0, linewidth=2, linestyle="-", color=None, clip_on=False)
+  # we loop over the FacetGrid figure axes (g.axes.flat) and add the month as text with the right color
+  # notice how ax.lines[-1].get_color() enables you to access the last line's color in each matplotlib.Axes
+  # i = 0
+  # g.axes[0].set_ylabel("")
+  # for i, ax in enumerate(g.axes.flat):
+  #   ax.text(0, 0.02, submission_names[i], fontweight='bold', fontsize=15, color=ax.lines[-1].get_color())
+  #   ax.set_ylabel("")
+  #   plt.setp(ax.get_xticklabels(), fontsize=15, fontweight='bold')
+
+  # we use matplotlib.Figure.subplots_adjust() function to get the subplots to overlap
+  # g.fig.subplots_adjust(hspace=-0.3)
+
+  # # eventually we remove axes titles, yticks and spines
+  # g.set_titles("")
+  # g.set(yticks=[])
+  # g.despine(bottom=True, left=True)
+  # g.set_ylabels("")
+  # # i=0
+  # for i, ax in enumerate(g.axes.flat):
+  #     ax.text(15, 0.02, submission_names[i], fontweight='bold', fontsize=15, color=ax.lines[-1].get_color())
+
+
+
+  # plt.xlabel('Performance (%)', fontweight='bold', fontsize=15)
+  # g.fig.suptitle('AUC-ROC Performance of each submission across all seeds',
+  #               ha='center',
+  #               fontsize=20,
+  #               fontweight=20)
+
+  # plt.show()
+  def label(x, color, label):
+    ax = plt.gca()
+    ax.text(0, .2, label, fontweight="bold", color=color,
+            ha="left", va="center", transform=ax.transAxes)
+    
+  g.map(label, "Submissions")
+  
+  g.figure.subplots_adjust(hspace=-.25)
+  
+  # Remove axes details that don't play well with overlap
+  g.set_titles("")
+  g.set(yticks=[], ylabel="")
+  g.despine(bottom=True, left=True)
+
+
   
 def test_suite():
   x = np.random.rand()
@@ -953,8 +1164,20 @@ def test_suite():
 # plt.show()
 
 # run_tests(12)
-run_tests(11)
-run_tests(11*11)
-run_tests(11*11*11)
-run_tests(11*11*11*11)
-run_tests(11*11*11*11*11)
+
+seeds = [11]
+# seeds = [11, 11*11, 11*11*11, 11*11*11*11, 11*11*11*11*11]
+create_ridgeline(seeds)
+
+# new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test = develop_test_set(42)
+# # print(type(new_train_labels), new_train_labels)
+# # print(type(sex_test), sex_test)
+
+# submissions = run_nguigui_original(new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)
+# auc_results = auc_roc(submissions)
+# ga_results = general_accuracy(submissions)
+# eo_results = equalised_odds(submissions)
+
+# plot_auc_df(auc_results, 42)
+# plot_ga_df(ga_results, 42)
+# plot_eo_df(eo_results, 42)
