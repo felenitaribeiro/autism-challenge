@@ -20,6 +20,8 @@ from sklearn.model_selection import StratifiedKFold
 import seaborn as sns
 
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolours
+import matplotlib.lines as mlines
 
 import os as os
 
@@ -302,6 +304,51 @@ def determine_statistics(labels, results, sex):
           (male_true_positive, male_false_positive, male_false_negative, male_true_negative, male_auc), 
           (female_true_positive, female_false_positive, female_false_negative, female_true_negative, female_auc)]
 
+def plot_violin(df, title, subtitle, split_string, seed):
+
+  custom_colour_palette = ["#A14756", "#524C72"]
+
+  sns.set_theme(style="whitegrid")
+  sns.set_palette(custom_colour_palette)
+
+  
+  plot = sns.violinplot(data=df, x="Submissions", y="Results", split=True, hue=split_string, inner="stick")
+
+  # Function to add text labels for mean
+  def add_mean_labels(data, x_positions, ax):
+      i = 0
+      for x in x_positions:
+          sub_data = data[data['Submissions'] == x]
+          mean = sub_data['Results'].mean()
+
+          text_x = i
+          text_y = mean + 5
+          text = f'Mean: {mean:.2f}'
+          ax.text(text_x-0.25, text_y, text, ha='center', va='bottom', fontsize=10, color='black', rotation=90)
+          i += 1
+
+  # Get the current Axes
+  ax = plt.gca()
+
+  # Get the x-positions for labels
+  x_positions = sorted(df['Submissions'].unique())
+
+  # Add mean labels
+  add_mean_labels(df, x_positions, ax)
+
+  # Get the x-positions for labels
+  x_positions = sorted(df['Submissions'].unique())
+
+  # Add mean labels
+  add_mean_labels(df, x_positions, ax)
+  plot.set_title(title +' Performance of 10 Best Submissions: Seed '+str(seed))
+  plot.set_xticklabels(plot.get_xticklabels(), rotation = 90)  
+  plot.set_xlabel('Submissions')
+  plot.set_ylabel(subtitle)
+  plot.legend(loc=(1.040, 0.5))
+  plt.savefig('results/Seeded Results/'+str(seed)+'/'+title+'_violin.png', bbox_inches="tight")
+  plt.show()
+
 def auc_roc(results):
   # print(type(results), results)
   test_names = results.index.values.tolist()
@@ -350,15 +397,9 @@ def auc_roc(results):
   return auc_df
 
 def plot_auc_df(auc_df, seed):
-  sns.set_theme(style="whitegrid")
-  plot = sns.violinplot(data=auc_df, x="Submissions", y="Results", split=True, hue="Sex", inner="stick")
-  plot.set_title('AUC-ROC Performance of 10 Best Submissions: Seed '+str(seed))
-  plot.set_xticklabels(plot.get_xticklabels(), rotation = 90)  
-  plot.set_xlabel('Submissions')
-  plot.set_ylabel('AUC (%)')
-  plot.legend(loc=(1.040, 0.5))
-  plt.savefig('results/Seeded Results/'+str(seed)+'/auc_roc.png', bbox_inches="tight")
-  plt.show()
+  
+  plot_violin(auc_df, "AUC-ROC", "AUC-ROC", "Sex", seed)
+  create_ridgeline(auc_df, "AUC", "AUC performance (%)", seed)
 
 def general_accuracy(results):
 
@@ -404,19 +445,12 @@ def general_accuracy(results):
                         "Results": ga_sex,
                         "Sex": sex
                         })
-
   return ga_df
 
 def plot_ga_df(ga_df, seed):
-  sns.set_theme(style="whitegrid")
-  plot = sns.violinplot(data=ga_df, x="Submissions", y="Results",  split = True, hue="Sex", inner="stick")
-  plot.set_title('General Accuracy  Performance of 10 Best Submissions: Seed '+str(seed))
-  plot.set_xticklabels(plot.get_xticklabels(), rotation = 90)
-  plot.set_xlabel('Submissions')
-  plot.set_ylabel('Accuracy (%)')
-  plot.legend(loc=(1.040, 0.5))
-  plt.savefig('results/Seeded Results/'+str(seed)+'/ga.png', bbox_inches="tight")
-  plt.show()
+
+  plot_violin(ga_df, "GA", "GA", "Sex", seed)
+  create_ridgeline(ga_df, "GA", "GA performance (%)",  seed)
 
 def equalised_odds(results):
 
@@ -519,22 +553,14 @@ def equalised_odds(results):
   eo_df = pd.DataFrame({"Submissions": generalised_submission_names,
                         "Results": np.concatenate([eo_tpr, eo_fpr]), 
                         "TPR:FPR": eo_tpr_fpr})
-
+  print(eo_df)
   return eo_df
-  # print(eo_df)
-
 
 def plot_eo_df(eo_df, seed):
-  sns.set_theme(style="whitegrid")
-  plot = sns.violinplot(data=eo_df, x="Submissions", y="Results",  split = True, hue = "TPR:FPR", inner="stick")
-  plot.set_title('Equalised Odds Results Performance of 10 Best Submissions: Seed '+str(seed))
-  plot.set_xticklabels(plot.get_xticklabels(), rotation = 90)  
-  plot.set_xlabel('Submissions')
-  plot.set_ylabel('True Positive Rate/False Positive Rate (%)')
-  plt.savefig('results/Seeded Results/'+str(seed)+'/eo.png', bbox_inches="tight")
-  # plot.legend(loc=(1.040, 0.5))
-  plt.show()
-
+  plot_violin(eo_df, "EO", "Difference in EO performance [male - female] (%)", "TPR:FPR", seed)
+  create_ridgeline(eo_df[eo_df["TPR:FPR"]=="tpr"], "EO TPR", "Difference in TPR performance [male - female] (%)", seed)
+  create_ridgeline(eo_df[eo_df["TPR:FPR"]=="fpr"], "EO FPR", "Difference in FPR performance [male - female] (%)", seed)
+  create_ridgeline(eo_df, "EO", "Difference in EO performance [male - female] (%)", seed)
 
 def separate_test_suite(overall_set, overall_labels):
   # print(overall_labels.size)
@@ -855,8 +881,8 @@ def develop_test_set(seed):
   return new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test
 
 
-def run_tests(seed, new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test):
-  np.random.default_rng(seed=42)
+def run_single_test(seed, new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test):
+  # np.random.default_rng(seed=42)
   
   try:
     os.mkdir("results")
@@ -873,50 +899,6 @@ def run_tests(seed, new_train_dataset, new_train_labels, new_test_dataset, new_t
   except OSError as error:
     print("Folder " + str(seed) + " exists already, punk")
 
-
-
-  #Display initial dataset information
-  # print(data_train.info())
-  # print(labels_train.size)
-  # print(data_test.info())
-  # print(labels_test.size)
-
-  #Display information of initial datasets with respect to acquisition sites.
-  # print(data_train["participants_site"].value_counts().sort_index())
-  # print(data_test["participants_site"].value_counts().sort_index())
-
-  #Merge both intial datasets to preserve all datasets
-
-
-  # check_state =  np.random.get_state()
-  # check_seed = check_state[1][0]
-  # check_seed = np.random.get_state()
-  # print("Yo, the test set was developed with random seed: ", check_seed)
-
-  # print(sex_test)
-  #Check uniqueness of training and test datasets
-  # print(determine_unique_dataframe(new_train_dataset, new_test_dataset))
-  # print(determine_unique_dataframe(new_train_dataset, new_train_dataset))
-
-  #Display information of training/testing datasets and their results.
-  # print(data_train.index)
-  # print(new_train_dataset.index)
-  # print(new_train_dataset.info())
-  # print(new_train_labels.size)
-  # print(new_test_dataset.info())
-  # print(new_test_labels.size)
-
-  #Display training/testing results
-  # print(labels_train)
-  # print(labels_test)
-  # print(merged_labels)
-
-  #Indexing a dataframe
-  # print(merged_dataset.loc[10631804530197433027])
-
-  #Display gender ratio information
-  # print_gender_info()
-  # gender_ratio_per_fold()
   submissions = []
 
  
@@ -954,17 +936,17 @@ def run_tests(seed, new_train_dataset, new_train_labels, new_test_dataset, new_t
   auc_results = auc_roc(submissions)
   ga_results = general_accuracy(submissions)
   eo_results = equalised_odds(submissions)
-  # plot_auc_df(auc_results, seed)
-  # plot_ga_df(ga_results, seed)
-  # plot_eo_df(eo_results, seed)
+  plot_auc_df(auc_results, seed)
+  plot_ga_df(ga_results, seed)
+  plot_eo_df(eo_results, seed)
 
-  # auc_results['seed'] = seed
-  # ga_results['seed'] = seed
-  # eo_results['seed'] = seed
+  auc_results['seed'] = seed
+  ga_results['seed'] = seed
+  eo_results['seed'] = seed
 
   return auc_results, ga_results, eo_results
   
-def create_ridgeline(seeds):
+def run_multiple_test(seeds):
   seed_auc = []
   seed_ga = []
   seed_eo = []
@@ -973,7 +955,7 @@ def create_ridgeline(seeds):
 
   #collect all the test results for each auc, ga and eo.
   for seed in seeds:
-    new_tests = run_tests(seed, new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)
+    new_tests = run_single_test(seed, new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test)
     seed_auc.append(new_tests[0])
     seed_ga.append(new_tests[1])
     seed_eo.append(new_tests[2])
@@ -986,21 +968,36 @@ def create_ridgeline(seeds):
   merged_seed_eo = seed_eo[i]
   while i < len(seeds)-1:
     merged_seed_auc = pd.concat([merged_seed_auc, seed_auc[i+1]])
-    merged_seed_auc = pd.concat([merged_seed_ga, seed_ga[i+1]])
-    merged_seed_auc = pd.concat([merged_seed_eo, seed_eo[i+1]])
+    merged_seed_ga = pd.concat([merged_seed_ga, seed_ga[i+1]])
+    merged_seed_eo = pd.concat([merged_seed_eo, seed_eo[i+1]])
     i+=1
-  # print(merged_seed_auc) #Should be len(seeds)*
+  print(merged_seed_eo) #Should be len(seeds)*
 
-  # plt.figure(figsize = (8, 5))
 
-  # categories = merged_seed_auc['Submissions'].unique()
+  # used_dataframe = seed_eo[0][seed_eo[0]["TPR:FPR"] == "tpr"]
+  create_ridgeline(merged_seed_eo[merged_seed_eo["TPR:FPR"]=="tpr"], "Aggragate TPR over seeds: "+str(seeds), "Difference in TPR performance [male - female] (%)", seeds)
+  create_ridgeline(merged_seed_eo[merged_seed_eo["TPR:FPR"]=="fpr"], "Aggragate FPR over seeds: "+str(seeds), "Difference in FPR performance [male - female] (%)", seeds)
+  create_ridgeline(merged_seed_eo, "Aggragate EO over seeds: "+str(seeds), "Difference in EO performance [male - female] (%)", seeds)
 
-  # for category in categories:
-  #   subset = merged_seed_auc[merged_seed_auc['Submissions'] == category]
-  #   sns.kdeplot(data=subset["Results"], label=category, shade = True)
+def get_palette():
+  start_color = "#A14756"
+  end_color = "#524C72"
+
+  start_rgb = mcolours.hex2color(start_color)
+  end_rgb = mcolours.hex2color(end_color)
+
+  interpolated_values = np.linspace(0, 1, 10)
+
+  interpolated_colours = [
+      mcolours.to_hex(np.array(start_rgb) + t * (np.array(end_rgb) - np.array(start_rgb)))
+      for t in interpolated_values
+  ]
+  return interpolated_colours
+
+def create_ridgeline(df, title, subtitle, seed):
 
   submission_dict = {}
-  submission_names = seed_auc[0]["Submissions"].unique()
+  submission_names = df["Submissions"].unique()
   # print(submission_names)
   i = 0
   for name in submission_names:
@@ -1009,71 +1006,54 @@ def create_ridgeline(seeds):
   # print(submission_dict)
 
   sns.set_theme(style="white", rc={"axes.facecolor": (0, 0, 0, 0)}) 
-  # we generate a color palette with Seaborn.color_palette()
-  pal = sns.cubehelix_palette(10, rot=-.25, light=.7)
+  
+  # Compute quartile values
+  q25, q50, q75 = np.percentile(df["Results"], [25, 50, 75])
+
+  colour_theme = get_palette()
+  sns.set_palette(colour_theme, 10, color_codes=True)
 
   # in the sns.FacetGrid class, the 'hue' argument is the one that is the one that will be represented by colors with 'palette'
-  # g = sns.FacetGrid(merged_seed_auc, row='Submissions', aspect = 15, height = 1, palette = pal)
-  g = sns.FacetGrid(merged_seed_eo, row="Submissions", hue="Submissions", aspect=15, height=1, palette=pal)
+  g = sns.FacetGrid(df, row="Submissions", hue="Submissions", aspect=15, height=1, palette=colour_theme)
   
   # then we add the densities kdeplots for each month
-  # g.map(sns.kdeplot, 'Results', bw_adjust = 1, clip_on=False, fill=True, alpha=1, linewidth=1.5) 
-  g.map(sns.kdeplot, "Results", bw_adjust=.5, clip_on=False, fill=True, alpha=1, linewidth=1.5)
-
+  g.map(sns.kdeplot, "Results", bw_adjust=0.3, clip_on=False, fill=True, alpha=1, linewidth=1.5)
+  
   # here we add a white line that represents the contour of each kdeplot
-  # g.map(sns.kdeplot, 'Results', bw_adjust=1, clip_on=False, color="w", lw=2)
+  g.map(sns.kdeplot, 'Results', bw_adjust=0.3, clip_on=False, color="w", linewidth=2)
   
   # here we add a horizontal line for each plot
-  # g.map(plt.axhline, y=0, lw=2, clip_on=False)
-  g.map(sns.kdeplot, "Results", clip_on=False, color="w", lw=2, bw_adjust=.5)
-
-
   g.refline(y=0, linewidth=2, linestyle="-", color=None, clip_on=False)
-  # we loop over the FacetGrid figure axes (g.axes.flat) and add the month as text with the right color
-  # notice how ax.lines[-1].get_color() enables you to access the last line's color in each matplotlib.Axes
-  # i = 0
-  # g.axes[0].set_ylabel("")
-  # for i, ax in enumerate(g.axes.flat):
-  #   ax.text(0, 0.02, submission_names[i], fontweight='bold', fontsize=15, color=ax.lines[-1].get_color())
-  #   ax.set_ylabel("")
-  #   plt.setp(ax.get_xticklabels(), fontsize=15, fontweight='bold')
 
-  # we use matplotlib.Figure.subplots_adjust() function to get the subplots to overlap
-  # g.fig.subplots_adjust(hspace=-0.3)
+  # # Add a rug plot to show individual data points
+  # g.map(sns.rugplot, "Results", color="black", height=0.25)
 
-  # # eventually we remove axes titles, yticks and spines
-  # g.set_titles("")
-  # g.set(yticks=[])
-  # g.despine(bottom=True, left=True)
-  # g.set_ylabels("")
-  # # i=0
-  # for i, ax in enumerate(g.axes.flat):
-  #     ax.text(15, 0.02, submission_names[i], fontweight='bold', fontsize=15, color=ax.lines[-1].get_color())
+  # Function to add mean lines and annotations
+  def add_mean_lines_and_annotations(data, color, label):
+      ax = plt.gca()
+      mean = data['Results'].mean()
+      
+      ax.axvline(mean, color=color, linestyle='--', label='Mean', ymin=0.05, ymax=0.75)
+      ax.annotate(f'Mean: {mean:.2f}', xy=(mean, 0), xytext=(10, 45), textcoords='offset points', color='grey', fontweight='bold')
 
+  # Add mean lines and annotations to each ridgeline
+  g.map_dataframe(add_mean_lines_and_annotations)
 
-
-  # plt.xlabel('Performance (%)', fontweight='bold', fontsize=15)
-  # g.fig.suptitle('AUC-ROC Performance of each submission across all seeds',
-  #               ha='center',
-  #               fontsize=20,
-  #               fontweight=20)
-
-  # plt.show()
-  def label(x, color, label):
-    ax = plt.gca()
-    ax.text(0, .2, label, fontweight="bold", color=color,
-            ha="left", va="center", transform=ax.transAxes)
-    
-  g.map(label, "Submissions")
-  
   g.figure.subplots_adjust(hspace=-.25)
   
   # Remove axes details that don't play well with overlap
   g.set_titles("")
   g.set(yticks=[], ylabel="")
   g.despine(bottom=True, left=True)
-
-
+  plt.xlabel(subtitle, fontweight='bold', fontsize=15)
+  g.fig.suptitle(title, ha='right', fontsize=20, fontweight='bold')
+  
+  try:
+    os.mkdir("results/Seeded Results/"+str(seed))
+  except OSError as error:
+    print("Folder " + str(seed) + " exists already, punk")
+  plt.savefig('results/Seeded Results/'+str(seed)+"/"+title+'_ridgeline.png', bbox_inches="tight")
+  plt.show()
   
 def test_suite():
   x = np.random.rand()
@@ -1166,8 +1146,9 @@ def test_suite():
 # run_tests(12)
 
 seeds = [11]
+# seeds = [11*11*11*11, 11*11*11*11*11]
 # seeds = [11, 11*11, 11*11*11, 11*11*11*11, 11*11*11*11*11]
-create_ridgeline(seeds)
+run_multiple_test(seeds)
 
 # new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test = develop_test_set(42)
 # # print(type(new_train_labels), new_train_labels)
@@ -1181,3 +1162,18 @@ create_ridgeline(seeds)
 # plot_auc_df(auc_results, 42)
 # plot_ga_df(ga_results, 42)
 # plot_eo_df(eo_results, 42)
+
+# data_train, labels_train, data_test, labels_test = load_data()
+# sex_test = sex_index_split(data_test)
+# # new_train_dataset, new_train_labels, new_test_dataset, new_test_labels, sex_test = develop_test_set(42)
+# new_tests = run_single_test(42, data_train, labels_train, data_test, labels_test, sex_test)
+# seed_auc = []
+# seed_ga = []
+# seed_eo = []
+# seed_auc.append(new_tests[0])
+# seed_ga.append(new_tests[1])
+# seed_eo.append(new_tests[2])
+
+# merged_seed_auc = seed_auc[0]
+# print(np.average(merged_seed_auc["Results"]))
+# create_ridgeline(merged_seed_auc, "AUC", "AUC performance (%)", 42)
