@@ -1,7 +1,6 @@
 # Algorithmic Bias Investigation of Winners of the IMaging-PsychiAtry Challenge: predicting autism
 
-[![Build Status](https://travis-ci.org/ramp-kits/autism.svg?branch=master)](https://travis-ci.org/ramp-kits/autism)
-
+Note this is a fork from the original challenge and has been utilised as part of a thesis submission. The contents of this fork have been heavily editted during the investigation. For original documents pease go upstream into the "main" brainch or further to https://github.com/neuroanatomy/autism-challenge
 ## Getting started
 
 This starting kit requires Python and the following dependencies:
@@ -33,10 +32,9 @@ jupyter notebook autism_starting_kit.ipynb
 ```
 
 
-## Recommended install using `conda` (optional)
+## Recommended install using `conda` (trust me, use this method)
 
-We provide both an `environment.yml` file which can be used with `conda` to
-create a clean environment and install the necessary dependencies.
+I have found an environment able to run all submissions. This `environment.yml` file which can be used with `conda` to create a clean environment and install the necessary dependencies.
 
 ```
 conda env create -f environment.yml
@@ -53,7 +51,3 @@ for Linux and MacOS. In Windows, use the following command instead:
 ```
 activate autism
 ```
-
-## Launch on Binder
-
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/ramp-kits/autism/best_submissions?filepath=best_submissions.ipynb)
