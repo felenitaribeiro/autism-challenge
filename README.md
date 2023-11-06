@@ -1,4 +1,4 @@
-# starting kit for the IMaging-PsychiAtry Challenge: predicting autism
+# Algorithmic Bias Investigation of Winners of the IMaging-PsychiAtry Challenge: predicting autism
 
 [![Build Status](https://travis-ci.org/ramp-kits/autism.svg?branch=master)](https://travis-ci.org/ramp-kits/autism)
 
@@ -6,15 +6,18 @@
 
 This starting kit requires Python and the following dependencies:
 
-* `numpy`
+* `numpy<1.21.6`
 * `scipy`
-* `pandas`
-* `scikit-learn`
+* `pandas>=0.21`
+* `scikit-learn>=0.19,<0.22`
 * `matplolib`
 * `seaborn`
-* `nilearn`
+* `nilearn<0.8`
 * `jupyter`
 * `ramp-workflow`
+* `cloudpickle`
+* `keras`
+* `tensorflow=2.5`
 
 Therefore, we advise you to install [Anaconda
 distribution](https://www.anaconda.com/download/) which include almost all
@@ -23,14 +26,14 @@ dependencies.
 Only `nilearn` and `ramp-workflow` are not included by default in the Anaconda
 distribution. They will be installed from the execution of the notebook.
 
-Execute the jupyter notebook, from the root directory using:
+You can attempt to install these by executing the jupyter notebook, from the root directory using:
 
 ```
 jupyter notebook autism_starting_kit.ipynb
 ```
 
 
-## Advanced install using `conda` (optional)
+## Recommended install using `conda` (optional)
 
 We provide both an `environment.yml` file which can be used with `conda` to
 create a clean environment and install the necessary dependencies.
