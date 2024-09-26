@@ -1,0 +1,17 @@
+name: autism-abethe
+channels:
+  - conda-forge
+dependencies:
+  - numpy<1.21.6
+  - scipy
+  - pandas>=0.21
+  - scikit-learn>=0.19,<0.22
+  - nilearn<0.8
+  - matplotlib
+  - seaborn
+  - jupyter
+  - cloudpickle
+  - keras
+  - pip
+  - pip:
+    - https://api.github.com/repos/paris-saclay-cds/ramp-workflow/zipball/0.2.1 
